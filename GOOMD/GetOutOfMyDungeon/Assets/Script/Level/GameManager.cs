@@ -9,11 +9,12 @@ public class GameManager : MonoBehaviour
 
     [Header("Riferimenti")]
     public SkullIntegrity skull;   // se vuoto lo cerco in scena
+    public WinHole winHole;        // idem
 
     [Header("Condizioni di vittoria")]
     public bool requireAllEnemiesDead = true;
-    public int requiredPower = 0;
     public PuzzleTrigger[] requiredPuzzles;
+    public bool requireWinHole = true;   // il livello finisce imbucando il teschio
 
     [Header("Condizioni di sconfitta")]
     public float fallY = -20f;     // rete di sicurezza sotto il livello
@@ -31,6 +32,11 @@ public class GameManager : MonoBehaviour
     {
         Instance = this;
         if (skull == null) skull = FindFirstObjectByType<SkullIntegrity>();
+        if (winHole == null) winHole = FindFirstObjectByType<WinHole>();
+
+        if (requireWinHole && winHole == null)
+            Debug.LogWarning("GameManager: nessuna WinHole in scena, il livello non " +
+                             "puo' essere vinto. Aggiungine una o togli Require Win Hole.", this);
     }
 
     void OnDestroy()
@@ -42,7 +48,11 @@ public class GameManager : MonoBehaviour
     {
         if (!IsPlaying) return;
 
-        if (skull != null && skull.transform.position.y < fallY)
+        // il teschio imbucato non "cade": se la buca e' incassata nel terreno
+        // la rete di sicurezza scatterebbe proprio sulla vittoria
+        bool potted = winHole != null && winHole.IsPotted;
+
+        if (!potted && skull != null && skull.transform.position.y < fallY)
         {
             Lose("Caduto fuori dal livello");
             return;
@@ -51,16 +61,28 @@ public class GameManager : MonoBehaviour
         if (CheckObjectives()) Win();
     }
 
-    bool CheckObjectives()
+    // Obiettivi del livello esclusa la buca. Li legge anche la WinHole per
+    // sapere se aprirsi: la buca e' l'ultimo gesto, non uno dei tanti.
+    public bool AreLevelObjectivesMet()
     {
         if (requireAllEnemiesDead && EnemyHealth.AliveCount > 0) return false;
-        if (Power < requiredPower) return false;
 
         if (requiredPuzzles != null)
         {
             foreach (PuzzleTrigger p in requiredPuzzles)
                 if (p != null && !p.IsSolved) return false;
         }
+
+        return true;
+    }
+
+    bool CheckObjectives()
+    {
+        if (!AreLevelObjectivesMet()) return false;
+
+        // il Power non e' un obiettivo: e' la valuta che il teschio accumula
+        // uccidendo i nemici, da spendere nei potenziamenti
+        if (requireWinHole) return winHole != null && winHole.IsPotted;
 
         return true;
     }

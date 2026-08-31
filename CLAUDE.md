@@ -51,6 +51,11 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   (aggiornato in `OnEnable`/`OnDisable`), flash rosso sul colpo, `powerReward`.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, currency `Power`,
   condizioni di vittoria in AND, `fallY` come rete di sicurezza.
+  `AreLevelObjectivesMet()` = tutto tranne la buca, letto anche dalla `WinHole`.
+- `Level/WinHole.cs` — la buca da biliardo che chiude il livello. Si apre quando
+  il teschio e' esploso **e** gli altri obiettivi sono fatti; imbucare a obiettivi
+  incompleti toglierebbe il teschio dal tavolo senza far vincere → soft lock.
+  Non chiama `Win()`: setta `IsPotted` e lascia decidere al `GameManager`.
 - `Level/KillZone.cs` — trigger di morte (lava). Riconosce il teschio da
   `SkullIntegrity`, non da tag.
 - `Level/PuzzleTrigger.cs` — segnaposto: qualsiasi meccanismo chiama `Solve()`.
@@ -64,16 +69,24 @@ serve la velocita' in ingresso, salvata a fine `FixedUpdate` (`lastVelocity` in
 
 ## Condizioni di vittoria / sconfitta (decise dall'utente)
 
-- **Vinci**: uccidere i nemici + risolvere i puzzle + guadagnare Power
-  (currency interna, da spendere in potenziamenti — sistema non ancora progettato).
-- **Perdi**: rottura del teschio (che **non** subisce danno dalle esplosioni, ma si
-  logora rotolando) oppure caduta in una zona fuori mappa (lago di lava).
+Gioco **a livelli**.
+
+- **Vinci**: uccidere i nemici + risolvere i puzzle, poi **imbucare il teschio
+  nella `WinHole`** — che si apre solo dopo che il teschio e' esploso.
+- **Perdi**: integrita' del teschio a zero (si logora rotolando, **non** subisce
+  danno dalle esplosioni) oppure caduta fuori mappa (`KillZone` / `fallY`).
+- Il **Power** non e' un obiettivo: e' la valuta che il teschio guadagna
+  uccidendo i nemici (`EnemyHealth.powerReward`), da spendere in potenziamenti.
+  Il sistema di acquisto non esiste ancora.
 
 ## Setup Unity ancora da fare dall'utente
 
 1. `SkullRolling` + `SkullIntegrity` sullo `Skull_player`
-2. Un GameObject con `GameManager` (puo' essere `Game_Controller`)
+2. Un collider in trigger con `WinHole` — **senza, il livello non e' vincibile**
+   (il `GameManager` lo segnala con un warning in console all'avvio)
 3. Un collider in trigger con `KillZone` dove va la lava
+
+Gia' fatto: `GameManager` e' in scena su un GameObject dedicato.
 
 **Niente e' mai stato compilato in Unity in queste sessioni** (nessuna CLI Unity
 disponibile): chiedi conferma che compili prima di dare per buono il codice nuovo.
