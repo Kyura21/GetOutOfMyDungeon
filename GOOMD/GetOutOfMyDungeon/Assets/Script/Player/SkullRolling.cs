@@ -23,6 +23,11 @@ public class SkullRolling : MonoBehaviour
 
     void FixedUpdate()
     {
+        // teschio imbucato dalla WinHole: e' kinematic, non lo muove piu' la
+        // fisica. Scrivergli la velocita' non farebbe niente e Unity avvisa
+        // a ogni frame.
+        if (rb.isKinematic) return;
+
         Vector3 v = rb.linearVelocity;
 
         if (v.sqrMagnitude < stopThreshold * stopThreshold)
@@ -49,6 +54,7 @@ public class SkullRolling : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
+        if (rb.isKinematic) return;
         if (collisionSpeedLoss <= 0f) return;
 
         float speed = lastVelocity.magnitude;
