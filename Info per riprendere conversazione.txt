@@ -1,0 +1,29 @@
+Cosa ho scritto
+
+UnityTest/CLAUDE.md — lo leggo in automatico all'avvio in questa cartella. Contiene la scena, tutti gli script e cosa fanno, le decisioni su win/lose, il setup Unity che ti manca, i punti aperti, e soprattutto le tre trappole su cui abbiamo perso tempo: la mira relativa (non tornare al raycast), il fatto che PhysX non ha attrito di rotolamento, e la velocità già di rimbalzo dentro OnCollisionEnter. È anche leggibile da te, non solo da me.
+
+Memoria di sessione — due note che sopravvivono fuori dalla cartella: che parli italiano e che qui non posso compilare, quindi non devo dare per buono codice non verificato.
+
+Come riprendere
+
+Tre modi, dal più preciso al più leggero:
+
+┌───────────────────┬─────────────────────────────────────────────────────┐
+│      Comando      │                       Cosa fa                       │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│ claude --continue │ riapre questa conversazione com'è                   │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│ claude --resume   │ ti fa scegliere da un elenco delle sessioni passate │
+├───────────────────┼─────────────────────────────────────────────────────┤
+│ claude            │ sessione nuova, ma legge CLAUDE.md e la memoria     │
+└───────────────────┴─────────────────────────────────────────────────────┘
+
+L'importante è lanciarlo da C:\Users\PC\Desktop\Claude\UnityTest: i primi due si agganciano alla cartella. Anche partendo pulito con il terzo, ti basta dire "riprendiamo da dove eravamo" e ho tutto.
+
+Una cosa che ti consiglio
+
+Il progetto non è sotto git. Finché è così, se una modifica rompe qualcosa non c'è modo di tornare indietro, e il contesto dipende da un unico file. Bastano due minuti:
+
+git init
+
+Ti preparo io un .gitignore adatto a Unity (Library/, Temp/, Logs/ fuori — sono rigenerabili e pesantissimi) e faccio il primo commit, se vuoi. Dimmelo ora o alla prossima sessione.

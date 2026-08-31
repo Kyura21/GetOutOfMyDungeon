@@ -1,0 +1,68 @@
+# ---------------------------------------------------------------
+# Unity - cartelle rigenerate dall'editor, mai da committare
+# I pattern non sono ancorati alla root perche' il progetto Unity
+# e' annidato in GOOMD/GetOutOfMyDungeon/
+# ---------------------------------------------------------------
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset Store scaricati (rigenerabili dall'account)
+[Aa]ssets/AssetStoreTools*
+
+# Package manager: Packages/manifest.json e packages-lock.json VANNO committati
+[Pp]ackages/com.unity.*/
+
+# ---------------------------------------------------------------
+# IDE / soluzioni: Unity le rigenera a ogni apertura
+# ---------------------------------------------------------------
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vsconfig
+
+# ---------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------
+*.apk
+*.aab
+*.unitypackage
+*.app
+ExportedObj/
+crashlytics-build.properties
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# ---------------------------------------------------------------
+# Sistema operativo
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------
+# Non ignorare i .meta: Unity li usa per legare GUID e asset.
+# Perderli rompe tutti i riferimenti in scena.
+# ---------------------------------------------------------------
+!*.meta

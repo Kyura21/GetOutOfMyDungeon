@@ -1,0 +1,43 @@
+# Normalizzazione fine riga: git decide da solo per i file di testo
+* text=auto
+
+# File Unity in formato testo (YAML): diff e merge leggibili.
+# Richiedono Force Text in Edit > Project Settings > Editor > Asset Serialization
+*.cs        text diff=csharp
+*.shader    text
+*.hlsl      text
+*.cginc     text
+*.unity     text merge=unityyamlmerge eol=lf
+*.prefab    text merge=unityyamlmerge eol=lf
+*.asset     text merge=unityyamlmerge eol=lf
+*.mat       text merge=unityyamlmerge eol=lf
+*.anim      text merge=unityyamlmerge eol=lf
+*.controller text merge=unityyamlmerge eol=lf
+*.physicMaterial text merge=unityyamlmerge eol=lf
+*.meta      text merge=unityyamlmerge eol=lf
+*.json      text
+*.md        text
+
+# Binari: niente conversione fine riga, niente tentativi di diff
+*.fbx       binary
+*.obj       binary
+*.blend     binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.tga       binary
+*.psd       binary
+*.tif       binary
+*.exr       binary
+*.hdr       binary
+*.wav       binary
+*.mp3       binary
+*.ogg       binary
+*.ttf       binary
+*.otf       binary
+*.dll       binary
+*.unitypackage binary
+
+# Nota: quando entreranno modelli e texture veri, conviene passare questi
+# binari a Git LFS (git lfs install, poi git lfs track "*.fbx" ecc.).
+# Oggi l'asset piu' grande e' 60 KB, quindi LFS sarebbe solo complicazione.
