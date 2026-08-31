@@ -2,21 +2,19 @@ using UnityEngine;
 using UnityEngine.Events;
 
 // Buca di fine livello, come la buca di un tavolo da biliardo.
-// Va su un collider in trigger. Resta CHIUSA finche' il teschio non e'
-// esploso: prima di allora il teschio ci passa sopra e non succede niente.
+// Va su un collider in trigger.
+//
+// E' una via di vittoria PARALLELA, non un requisito: imbucare vince il
+// livello anche senza aver ucciso nessuno o risolto puzzle. Cambia solo il
+// punteggio finale, non l'esito.
+//
+// Resta chiusa finche' non vengono colpiti gli HoleOpener elencati qui sotto.
 [RequireComponent(typeof(Collider))]
 public class WinHole : MonoBehaviour
 {
     [Header("Quando si apre")]
-    public bool requireSkullExploded = true;
-
-    // Guardia contro il soft lock: se la buca si aprisse con i nemici ancora
-    // vivi, imbucare il teschio non farebbe vincere ma lo toglierebbe dal
-    // tavolo, lasciando il livello ingiocabile e non perso.
-    public bool requireLevelObjectives = true;
-
-    [Header("Riferimenti")]
-    public SkullExplosion skull;   // se vuoto lo cerco in scena
+    public HoleOpener[] requiredOpeners;      // vuoto = aperta fin dall'inizio
+    public bool requireAllOpeners = true;     // false = ne basta uno qualsiasi
 
     [Header("Cattura del teschio")]
     public bool snapToCenter = true;
@@ -24,7 +22,7 @@ public class WinHole : MonoBehaviour
     public bool hideSkull = false;
 
     [Header("Eventi")]
-    public UnityEvent onOpened;     // la buca si apre: accendi luci, VFX, suono
+    public UnityEvent onOpened;     // la buca si apre: luci, VFX, suono
     public UnityEvent onPotted;     // teschio imbucato
     public UnityEvent onRejected;   // teschio arrivato a buca ancora chiusa
 
@@ -36,32 +34,37 @@ public class WinHole : MonoBehaviour
         GetComponent<Collider>().isTrigger = true;
     }
 
-    void Awake()
-    {
-        if (skull == null) skull = FindFirstObjectByType<SkullExplosion>();
-    }
-
     void Update()
     {
-        // l'apertura e' a senso unico: una volta aperta resta aperta,
-        // cosi' onOpened scatta una volta sola
+        // apertura a senso unico: una volta aperta resta aperta, cosi'
+        // onOpened scatta una volta sola
         if (IsOpen || IsPotted) return;
         if (!ShouldOpen()) return;
 
-        IsOpen = true;
-        onOpened.Invoke();
+        Open();
     }
 
     bool ShouldOpen()
     {
-        if (requireSkullExploded && (skull == null || !skull.HasEverExploded))
-            return false;
+        if (requiredOpeners == null || requiredOpeners.Length == 0) return true;
 
-        if (requireLevelObjectives && GameManager.Instance != null
-            && !GameManager.Instance.AreLevelObjectivesMet())
-            return false;
+        bool anyTriggered = false;
+        foreach (HoleOpener o in requiredOpeners)
+        {
+            if (o == null) continue;
 
-        return true;
+            if (o.IsTriggered) anyTriggered = true;
+            else if (requireAllOpeners) return false;
+        }
+
+        return requireAllOpeners || anyTriggered;
+    }
+
+    public void Open()
+    {
+        if (IsOpen) return;
+        IsOpen = true;
+        onOpened.Invoke();
     }
 
     void OnTriggerEnter(Collider other)

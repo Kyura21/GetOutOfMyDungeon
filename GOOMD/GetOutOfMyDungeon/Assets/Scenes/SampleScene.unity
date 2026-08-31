@@ -223,7 +223,6 @@ GameObject:
   m_Component:
   - component: {fileID: 203848990}
   - component: {fileID: 203848989}
-  - component: {fileID: 203848991}
   m_Layer: 0
   m_Name: Game_Controller
   m_TagString: Untagged
@@ -274,29 +273,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &203848991
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 203848988}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9b422c585f6fbc14c81735e1a284f81d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::GameManager
-  skull: {fileID: 0}
-  requireAllEnemiesDead: 1
-  requiredPower: 0
-  requiredPuzzles: []
-  fallY: -20
-  onWin:
-    m_PersistentCalls:
-      m_Calls: []
-  onLose:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -829,6 +805,7 @@ GameObject:
   - component: {fileID: 613563138}
   - component: {fileID: 613563136}
   - component: {fileID: 613563137}
+  - component: {fileID: 613563143}
   - component: {fileID: 613563142}
   m_Layer: 0
   m_Name: Skull_player
@@ -888,6 +865,9 @@ MonoBehaviour:
   damageFalloff: 0
   freezeSkullOnExplode: 1
   hideSkullOnExplode: 0
+  onExploded:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!135 &613563138
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -997,6 +977,29 @@ MonoBehaviour:
   stopThreshold: 0.4
   collisionSpeedLoss: 0.35
   minImpactSpeed: 1
+--- !u!114 &613563143
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 613563135}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: abd11871f3b8e75449cba622d263f5f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkullIntegrity
+  maxIntegrity: 100
+  wearPerMeter: 0.5
+  fragility: 1
+  wearPerImpact: 0.25
+  minImpactSpeed: 2
+  onWear:
+    m_PersistentCalls:
+      m_Calls: []
+  onBroken:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -1491,6 +1494,62 @@ MonoBehaviour:
   onDied:
     m_PersistentCalls:
       m_Calls: []
+--- !u!1 &1761067647
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1761067649}
+  - component: {fileID: 1761067648}
+  m_Layer: 0
+  m_Name: Game_Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1761067648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1761067647}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b422c585f6fbc14c81735e1a284f81d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  skull: {fileID: 613563143}
+  winHole: {fileID: 0}
+  requireAllEnemiesDead: 1
+  requiredPuzzles: []
+  requireWinHole: 1
+  fallY: -20
+  onWin:
+    m_PersistentCalls:
+      m_Calls: []
+  onLose:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!4 &1761067649
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1761067647}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.3047, y: 0.14708, z: -0.10275}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1503,3 +1562,4 @@ SceneRoots:
   - {fileID: 1222511972}
   - {fileID: 873394685}
   - {fileID: 203848990}
+  - {fileID: 1761067649}

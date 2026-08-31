@@ -22,7 +22,11 @@ public class EnemyHealth : MonoBehaviour
     public int maxHP = 3;
 
     [Header("Ricompensa")]
-    public int powerReward = 1;
+    public int powerReward = 1;          // valuta, da spendere nei potenziamenti
+
+    [Header("Punteggio danni")]
+    public int damageScorePerHP = 100;   // per ogni HP effettivamente tolto
+    public int damageScoreOnKill = 250;  // bonus alla morte
 
     [Header("Morte")]
     public GameObject deathVFX;
@@ -79,7 +83,14 @@ public class EnemyHealth : MonoBehaviour
     {
         if (IsDead || amount <= 0) return;
 
-        CurrentHP = Mathf.Max(0, CurrentHP - amount);
+        // conto gli HP tolti davvero: un colpo da 5 su un nemico con 2 HP
+        // vale 2, altrimenti si gonfierebbe il punteggio sull'ultimo colpo
+        int applied = Mathf.Min(CurrentHP, amount);
+        CurrentHP -= applied;
+
+        if (damageScorePerHP > 0 && GameManager.Instance != null)
+            GameManager.Instance.AddDamage(applied * damageScorePerHP);
+
         onDamaged.Invoke();
 
         if (flashOnHit) flashTimer = flashDuration;
@@ -95,8 +106,11 @@ public class EnemyHealth : MonoBehaviour
 
     void Die()
     {
-        if (powerReward > 0 && GameManager.Instance != null)
-            GameManager.Instance.AddPower(powerReward);
+        if (GameManager.Instance != null)
+        {
+            if (powerReward > 0) GameManager.Instance.AddPower(powerReward);
+            if (damageScoreOnKill > 0) GameManager.Instance.AddDamage(damageScoreOnKill);
+        }
 
         onDied.Invoke();
 

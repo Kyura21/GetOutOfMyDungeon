@@ -49,13 +49,18 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   con moltiplicatore crescente man mano che si rovina.
 - `Enemy/EnemyHealth.cs` — HP impostabili, registro statico `All` / `AliveCount`
   (aggiornato in `OnEnable`/`OnDisable`), flash rosso sul colpo, `powerReward`.
-- `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, currency `Power`,
-  condizioni di vittoria in AND, `fallY` come rete di sicurezza.
-  `AreLevelObjectivesMet()` = tutto tranne la buca, letto anche dalla `WinHole`.
-- `Level/WinHole.cs` — la buca da biliardo che chiude il livello. Si apre quando
-  il teschio e' esploso **e** gli altri obiettivi sono fatti; imbucare a obiettivi
-  incompleti toglierebbe il teschio dal tavolo senza far vincere → soft lock.
+- `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
+  `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
+  obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
+  oppure la buca. `LastWinReason` dice quale, servira' al punteggio.
+  `hasObjectives`, calcolato in `Start()`, evita che un livello senza obiettivi
+  configurati si vinca da solo al primo frame.
+- `Level/WinHole.cs` — la buca da biliardo. Imbucare **vince da solo**, senza
+  bisogno di aver ucciso o risolto niente (cambia solo il punteggio).
   Non chiama `Win()`: setta `IsPotted` e lascia decidere al `GameManager`.
+- `Level/HoleOpener.cs` — oggetto da colpire per aprire la buca. E' l'unica cosa
+  che la apre: **non** e' legato all'esplosione, cosi' si puo' fare una pacifist
+  run. `WinHole.requiredOpeners` vuoto = buca aperta da subito.
 - `Level/KillZone.cs` — trigger di morte (lava). Riconosce il teschio da
   `SkullIntegrity`, non da tag.
 - `Level/PuzzleTrigger.cs` — segnaposto: qualsiasi meccanismo chiama `Solve()`.
@@ -69,24 +74,35 @@ serve la velocita' in ingresso, salvata a fine `FixedUpdate` (`lastVelocity` in
 
 ## Condizioni di vittoria / sconfitta (decise dall'utente)
 
-Gioco **a livelli**.
+Gioco **a livelli**. Due modi di vincere, alternativi:
 
-- **Vinci**: uccidere i nemici + risolvere i puzzle, poi **imbucare il teschio
-  nella `WinHole`** — che si apre solo dopo che il teschio e' esploso.
-- **Perdi**: integrita' del teschio a zero (si logora rotolando, **non** subisce
-  danno dalle esplosioni) oppure caduta fuori mappa (`KillZone` / `fallY`).
-- Il **Power** non e' un obiettivo: e' la valuta che il teschio guadagna
-  uccidendo i nemici (`EnemyHealth.powerReward`), da spendere in potenziamenti.
-  Il sistema di acquisto non esiste ancora.
+- **Obiettivi**: uccidere i nemici + risolvere i puzzle + raggiungere la soglia
+  di `requiredDamage`, tutti in AND (ognuno disattivabile).
+- **Buca**: imbucare il teschio nella `WinHole`, che si apre colpendo gli
+  `HoleOpener` sparsi nel livello. Vale **da sola**, anche a nemici vivi: e' la
+  pacifist run. Cambia il punteggio finale, non l'esito.
+
+**Perdi**: integrita' del teschio a zero (si logora rotolando, **non** subisce
+danno dalle esplosioni) oppure caduta fuori mappa (`KillZone` / `fallY`).
+
+Due contatori distinti, da non confondere:
+
+- **Power** — valuta, dai nemici uccisi (`EnemyHealth.powerReward`), da spendere
+  in potenziamenti. Non e' mai un obiettivo. Sistema di acquisto non progettato.
+- **Damage** — punteggio distruzione stile modalita' Crash di Burnout
+  (`damageScorePerHP` sugli HP tolti davvero + `damageScoreOnKill`). Puo' essere
+  un obiettivo tramite `requiredDamage`. Per ora lo alimentano solo i nemici:
+  quando ci saranno oggetti distruttibili, chiamano `GameManager.AddDamage()`.
 
 ## Setup Unity ancora da fare dall'utente
 
-1. `SkullRolling` + `SkullIntegrity` sullo `Skull_player`
-2. Un collider in trigger con `WinHole` — **senza, il livello non e' vincibile**
-   (il `GameManager` lo segnala con un warning in console all'avvio)
-3. Un collider in trigger con `KillZone` dove va la lava
+1. Un collider in trigger con `WinHole` dove va la buca
+2. Uno o piu' oggetti con `HoleOpener` da colpire, elencati in
+   `WinHole.requiredOpeners` (se lasci l'array vuoto la buca e' aperta da subito)
 
-Gia' fatto: `GameManager` e' in scena su un GameObject dedicato.
+Gia' in scena: `GameManager`, `KillZone`, `SkullRolling` + `SkullIntegrity` +
+`SkullExplosion` sullo `Skull_player`, `SkullAimController`, `CameraController`,
+un `EnemyHealth`.
 
 **Niente e' mai stato compilato in Unity in queste sessioni** (nessuna CLI Unity
 disponibile): chiedi conferma che compili prima di dare per buono il codice nuovo.

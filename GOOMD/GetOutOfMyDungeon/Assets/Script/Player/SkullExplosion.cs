@@ -28,10 +28,6 @@ public class SkullExplosion : MonoBehaviour
     // esploso in questo tiro: si riarma a ogni Shoot()
     public bool HasExploded => hasExploded;
 
-    // esploso almeno una volta in questo livello: NON si riarma tra un tiro
-    // e l'altro, e' quello che apre la WinHole
-    public bool HasEverExploded { get; private set; }
-
     private bool hasExploded;
 
     // riusato a ogni esplosione: evita di colpire due volte lo stesso nemico
@@ -49,7 +45,6 @@ public class SkullExplosion : MonoBehaviour
     public void Explode(Vector3 point)
     {
         hasExploded = true;
-        HasEverExploded = true;
 
         if (explosionVFX != null)
         {
@@ -98,19 +93,11 @@ public class SkullExplosion : MonoBehaviour
         return Mathf.Max(1, Mathf.RoundToInt(explosionDamage * t));
     }
 
-    // riarma il teschio per il tiro successivo. Non tocca HasEverExploded:
-    // una volta esplosa, la buca resta aperta per il resto del livello.
+    // riarma il teschio per il tiro successivo
     public void ResetExplosion()
     {
         hasExploded = false;
         gameObject.SetActive(true);
-    }
-
-    // azzera anche la memoria di livello: da usare quando si ricomincia
-    public void ResetForLevel()
-    {
-        HasEverExploded = false;
-        ResetExplosion();
     }
 
     void OnDrawGizmosSelected()
