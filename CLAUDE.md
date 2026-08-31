@@ -4,8 +4,14 @@ Gioco Unity 3D: ibrido biliardo/golf in un dungeon. Colpisci un teschio-palla co
 una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i nemici.
 
 - Unity **6000.3.21f1**, URP, **new Input System** (`Mouse.current`, `Keyboard.current`)
-- Progetto Unity: `GOOMD/GetOutOfMyDungeon/`
-- **Non e' un repository git.** Niente storia dei commit: lo stato del lavoro vive qui.
+- Progetto Unity: `GOOMD/GetOutOfMyDungeon/` (annidato: la root del repo e' `UnityTest/`)
+- **Repository git** dal 2026-08-31. `git` non e' nel PATH: usa quello di Fork,
+  `C:\Users\PC\AppData\Local\Fork\gitInstance\2.50.1\cmd\git.exe`.
+  L'utente lavora con **Fork** come client grafico.
+- `Library/` (2 GB), `Logs/`, `UserSettings/`, `.vs/` e i progetti IDE sono ignorati:
+  Unity li rigenera. Gli asset veri pesano 0,3 MB, quindi **niente Git LFS** per ora.
+- I `.meta` vanno sempre committati insieme all'asset: legano i GUID ai riferimenti
+  in scena. Cancellarne uno rompe i collegamenti nell'Inspector.
 - L'utente parla **italiano**: rispondi sempre in italiano. Commenti nel codice in
   italiano senza accenti (per evitare problemi di encoding nei file .cs).
 
