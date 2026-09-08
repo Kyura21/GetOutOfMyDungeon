@@ -14,6 +14,9 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   in scena. Cancellarne uno rompe i collegamenti nell'Inspector.
 - L'utente parla **italiano**: rispondi sempre in italiano. Commenti nel codice in
   italiano senza accenti (per evitare problemi di encoding nei file .cs).
+- **`Docs/TUNING.md`** e' la wiki di taratura: ogni parametro esposto negli script,
+  cosa fa, il valore attuale in scena, i legami fra valori e i conti di bilanciamento.
+  Va aggiornata quando si aggiunge o rinomina un campo pubblico.
 
 ## Scena: `Assets/Scenes/SampleScene.unity`
 
@@ -94,15 +97,13 @@ Due contatori distinti, da non confondere:
   un obiettivo tramite `requiredDamage`. Per ora lo alimentano solo i nemici:
   quando ci saranno oggetti distruttibili, chiamano `GameManager.AddDamage()`.
 
-## Setup Unity ancora da fare dall'utente
+## Setup Unity
 
-1. Un collider in trigger con `WinHole` dove va la buca
-2. Uno o piu' oggetti con `HoleOpener` da colpire, elencati in
-   `WinHole.requiredOpeners` (se lasci l'array vuoto la buca e' aperta da subito)
-
-Gia' in scena: `GameManager`, `KillZone`, `SkullRolling` + `SkullIntegrity` +
-`SkullExplosion` sullo `Skull_player`, `SkullAimController`, `CameraController`,
-un `EnemyHealth`.
+Completo dal 2026-09-08. In scena: `GameManager`, `KillZone` (su `Lava`),
+`SkullRolling` + `SkullIntegrity` + `SkullExplosion` sullo `Skull_player`,
+`SkullAimController`, `CameraController`, tre `EnemyHealth`, `Win_hole` con
+`WinHole` e due `Hole_opener` con `HoleOpener` (collegati in `requiredOpeners`).
+Manca solo `PuzzleTrigger`, che non ha ancora un meccanismo vero dietro.
 
 **Niente e' mai stato compilato in Unity in queste sessioni** (nessuna CLI Unity
 disponibile): chiedi conferma che compili prima di dare per buono il codice nuovo.
