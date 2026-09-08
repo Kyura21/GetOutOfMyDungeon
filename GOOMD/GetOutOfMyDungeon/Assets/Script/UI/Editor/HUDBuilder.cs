@@ -1,0 +1,373 @@
+using TMPro;
+using UnityEditor;
+using UnityEditor.Events;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
+
+// Genera la gerarchia dell'HUD gia' cablata su HUDController.
+// Costruire a mano una trentina di RectTransform con le ancore giuste e' lungo
+// e facile da sbagliare: questo lo fa in un colpo solo. Da qui in poi si
+// modifica normalmente nell'Inspector, lo script non serve piu'.
+//
+// Sta in una cartella Editor: non finisce nella build.
+public static class HUDBuilder
+{
+    // dimensioni di riferimento del CanvasScaler: tutte le coordinate qui
+    // sotto sono in questo spazio, non in pixel dello schermo
+    private static readonly Vector2 Reference = new Vector2(1920f, 1080f);
+
+    private static readonly Color Ink = new Color(0.95f, 0.94f, 0.90f);
+    private static readonly Color InkDim = new Color(0.72f, 0.70f, 0.66f);
+    private static readonly Color BarTrack = new Color(0.08f, 0.07f, 0.09f, 0.75f);
+    private static readonly Color Accent = new Color(0.95f, 0.75f, 0.25f);
+    private static readonly Color Good = new Color(0.35f, 0.85f, 0.45f);
+    private static readonly Color Bad = new Color(0.9f, 0.3f, 0.25f);
+    private static readonly Color Veil = new Color(0.03f, 0.03f, 0.05f, 0.8f);
+
+    [MenuItem("GOOMD/Crea HUD in scena")]
+    public static void CreateHUD()
+    {
+        // Senza le TMP Essential Resources i testi esistono ma non hanno font
+        // e non si vede niente: meglio dirlo subito che far cercare il bug.
+        if (Resources.Load("TMP Settings") == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Mancano le risorse di TextMeshPro",
+                "Importa prima Window > TextMeshPro > Import TMP Essential Resources, " +
+                "poi rilancia GOOMD > Crea HUD in scena.",
+                "Ok");
+            return;
+        }
+
+        if (Object.FindFirstObjectByType<HUDController>() != null)
+        {
+            EditorUtility.DisplayDialog(
+                "HUD gia' presente",
+                "In scena c'e' gia' un HUDController. Cancella il vecchio HUD " +
+                "prima di generarne un altro.",
+                "Ok");
+            return;
+        }
+
+        GameObject canvasGO = new GameObject("HUD",
+            typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+
+        Canvas canvas = canvasGO.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+        CanvasScaler scaler = canvasGO.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = Reference;
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
+
+        HUDController hud = canvasGO.AddComponent<HUDController>();
+        ApplyDefaultGradients(hud);
+
+        Transform root = canvasGO.transform;
+
+        BuildIntegrity(root, hud);
+        BuildScores(root, hud);
+        BuildObjectives(root, hud);
+        BuildPowerMeter(root, hud);
+        hud.winPanel = BuildEndPanel(root, hud, true);
+        hud.losePanel = BuildEndPanel(root, hud, false);
+
+        EnsureEventSystem();
+
+        Undo.RegisterCreatedObjectUndo(canvasGO, "Crea HUD");
+        Selection.activeGameObject = canvasGO;
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+
+        Debug.Log("HUD creato e cablato. I riferimenti di gioco (GameManager, teschio, " +
+                  "SkullAimController) restano vuoti: l'HUDController li cerca da solo in Awake.",
+                  canvasGO);
+    }
+
+    // ---------- blocchi dell'HUD ----------
+
+    // in alto a sinistra: la barra vitale del giocatore
+    static void BuildIntegrity(Transform root, HUDController hud)
+    {
+        RectTransform group = NewRect("Integrity", root);
+        Place(group, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(40f, -40f), new Vector2(440f, 60f));
+
+        TextMeshProUGUI caption = NewText("Caption", group, "INTEGRITA'", 22f,
+            TextAlignmentOptions.Left, InkDim);
+        Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(280f, 26f));
+
+        TextMeshProUGUI value = NewText("Value", group, "100%", 22f,
+            TextAlignmentOptions.Right, Ink);
+        Place(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(140f, 26f));
+
+        Image fill;
+        Slider bar = NewBar("Bar", group, out fill);
+        StretchHorizontal(bar.GetComponent<RectTransform>(), -30f, 26f);
+
+        hud.integrityBar = bar;
+        hud.integrityFill = fill;
+        hud.integrityLabel = value;
+    }
+
+    // in alto a destra: danni (grande, e' il punteggio) e Power (piccolo, e' valuta)
+    static void BuildScores(Transform root, HUDController hud)
+    {
+        RectTransform group = NewRect("Scores", root);
+        Place(group, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -40f), new Vector2(460f, 130f));
+
+        TextMeshProUGUI caption = NewText("DamageCaption", group, "DANNI", 22f,
+            TextAlignmentOptions.Right, InkDim);
+        Place(caption.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(460f, 26f));
+
+        TextMeshProUGUI damage = NewText("DamageValue", group, "0", 60f,
+            TextAlignmentOptions.Right, Accent);
+        Place(damage.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0f, -26f), new Vector2(460f, 66f));
+
+        TextMeshProUGUI power = NewText("PowerValue", group, "POWER 0", 24f,
+            TextAlignmentOptions.Right, Ink);
+        Place(power.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(0f, -96f), new Vector2(460f, 30f));
+
+        hud.damageText = damage;
+        hud.powerCurrencyText = power;
+        hud.powerCurrencyFormat = "POWER {0}";
+    }
+
+    // in alto al centro: quanti nemici restano e se la buca si e' aperta
+    static void BuildObjectives(Transform root, HUDController hud)
+    {
+        RectTransform group = NewRect("Objectives", root);
+        Place(group, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(520f, 74f));
+
+        TextMeshProUGUI enemies = NewText("Enemies", group, "NEMICI 0 / 0", 26f,
+            TextAlignmentOptions.Center, Ink);
+        Place(enemies.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(520f, 32f));
+
+        RectTransform indicator = NewRect("HoleIndicator", group);
+        Place(indicator, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(520f, 32f));
+
+        TextMeshProUGUI holeLabel = NewText("Label", indicator, "BUCA APERTA", 26f,
+            TextAlignmentOptions.Center, Good);
+        Stretch(holeLabel.rectTransform);
+
+        indicator.gameObject.SetActive(false);
+
+        hud.enemiesText = enemies;
+        hud.enemiesFormat = "NEMICI {0} / {1}";
+        hud.holeIndicator = indicator.gameObject;
+    }
+
+    // in basso al centro: si accende solo mentre si carica il tiro
+    static void BuildPowerMeter(Transform root, HUDController hud)
+    {
+        RectTransform group = NewRect("PowerMeter", root);
+        Place(group, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(640f, 60f));
+
+        TextMeshProUGUI caption = NewText("Caption", group, "POTENZA", 22f,
+            TextAlignmentOptions.Center, InkDim);
+        Place(caption.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(640f, 26f));
+
+        Image fill;
+        Slider bar = NewBar("Bar", group, out fill);
+        StretchHorizontal(bar.GetComponent<RectTransform>(), -30f, 30f);
+        bar.value = 0f;
+
+        group.gameObject.SetActive(false);
+
+        hud.powerRoot = group.gameObject;
+        hud.powerBar = bar;
+        hud.powerFill = fill;
+    }
+
+    static GameObject BuildEndPanel(Transform root, HUDController hud, bool win)
+    {
+        RectTransform panel = NewRect(win ? "WinPanel" : "LosePanel", root);
+        Stretch(panel);
+
+        Image veil = NewImage("Veil", panel, Veil);
+        Stretch(veil.rectTransform);
+
+        TextMeshProUGUI title = NewText("Title", panel, win ? "VITTORIA" : "SCONFITTA", 84f,
+            TextAlignmentOptions.Center, win ? Good : Bad);
+        Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 150f), new Vector2(1000f, 100f));
+
+        TextMeshProUGUI reason = NewText("Reason", panel, "-", 34f,
+            TextAlignmentOptions.Center, Ink);
+        Place(reason.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 60f), new Vector2(1000f, 50f));
+
+        TextMeshProUGUI stats = NewText("Stats", panel, "-", 28f,
+            TextAlignmentOptions.Center, InkDim);
+        Place(stats.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, 0f), new Vector2(1000f, 44f));
+
+        // il bottone e' l'unica cosa cliccabile dell'HUD: tutto il resto ha
+        // raycastTarget spento per non rubare i click alla camera
+        RectTransform button = NewRect("RestartButton", panel);
+        Place(button, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            new Vector2(0f, -100f), new Vector2(300f, 68f));
+
+        Image buttonBg = button.gameObject.AddComponent<Image>();
+        buttonBg.color = new Color(0.16f, 0.15f, 0.18f, 0.95f);
+
+        Button btn = button.gameObject.AddComponent<Button>();
+        btn.targetGraphic = buttonBg;
+        UnityEventTools.AddPersistentListener(btn.onClick, hud.RestartLevel);
+
+        TextMeshProUGUI btnLabel = NewText("Label", button, "RIGIOCA", 30f,
+            TextAlignmentOptions.Center, Ink);
+        Stretch(btnLabel.rectTransform);
+
+        if (win)
+        {
+            hud.winReasonText = reason;
+            hud.winStatsText = stats;
+        }
+        else
+        {
+            hud.loseReasonText = reason;
+            hud.loseStatsText = stats;
+        }
+
+        panel.gameObject.SetActive(false);
+        return panel.gameObject;
+    }
+
+    static void EnsureEventSystem()
+    {
+        if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+
+        GameObject go = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+        Undo.RegisterCreatedObjectUndo(go, "Crea EventSystem");
+    }
+
+    // ---------- utilita' ----------
+
+    static RectTransform NewRect(string name, Transform parent)
+    {
+        GameObject go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return (RectTransform)go.transform;
+    }
+
+    static void Place(RectTransform rt, Vector2 anchor, Vector2 pivot, Vector2 position, Vector2 size)
+    {
+        rt.anchorMin = anchor;
+        rt.anchorMax = anchor;
+        rt.pivot = pivot;
+        rt.anchoredPosition = position;
+        rt.sizeDelta = size;
+    }
+
+    static void Stretch(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+    }
+
+    // largo quanto il genitore, agganciato in alto: cosi' allargando il gruppo
+    // nell'Inspector la barra segue senza doverla ritoccare
+    static void StretchHorizontal(RectTransform rt, float top, float height)
+    {
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, top);
+        rt.sizeDelta = new Vector2(0f, height);
+    }
+
+    static TextMeshProUGUI NewText(string name, Transform parent, string content, float size,
+                                   TextAlignmentOptions alignment, Color color)
+    {
+        RectTransform rt = NewRect(name, parent);
+        TextMeshProUGUI text = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        text.text = content;
+        text.fontSize = size;
+        text.alignment = alignment;
+        text.color = color;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    static Image NewImage(string name, Transform parent, Color color)
+    {
+        RectTransform rt = NewRect(name, parent);
+        Image image = rt.gameObject.AddComponent<Image>();
+        image.color = color;
+        image.raycastTarget = false;
+        return image;
+    }
+
+    static Slider NewBar(string name, Transform parent, out Image fill)
+    {
+        RectTransform rt = NewRect(name, parent);
+
+        Slider slider = rt.gameObject.AddComponent<Slider>();
+        slider.transition = Selectable.Transition.None;
+        slider.interactable = false;
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f;
+        slider.maxValue = 1f;
+        slider.value = 1f;
+
+        Navigation nav = slider.navigation;
+        nav.mode = Navigation.Mode.None;
+        slider.navigation = nav;
+
+        Image track = NewImage("Background", rt, BarTrack);
+        Stretch(track.rectTransform);
+
+        RectTransform area = NewRect("Fill Area", rt);
+        Stretch(area);
+
+        fill = NewImage("Fill", area, Accent);
+        RectTransform fillRect = fill.rectTransform;
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = new Vector2(0f, 1f);
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+
+        // e' lo Slider a guidare la larghezza del Fill a ogni cambio di value
+        slider.fillRect = fillRect;
+
+        return slider;
+    }
+
+    // stessi gradienti del Reset() di HUDController: aggiungendo il componente
+    // via codice Reset() non viene chiamato, quindi li rimetto qui
+    static void ApplyDefaultGradients(HUDController hud)
+    {
+        hud.integrityGradient = Gradient3(
+            new Color(0.85f, 0.15f, 0.15f),
+            new Color(0.95f, 0.75f, 0.15f),
+            new Color(0.25f, 0.8f, 0.35f));
+
+        hud.powerGradient = Gradient3(
+            new Color(0.95f, 0.85f, 0.3f),
+            new Color(0.95f, 0.55f, 0.15f),
+            new Color(0.9f, 0.2f, 0.15f));
+    }
+
+    static Gradient Gradient3(Color a, Color b, Color c)
+    {
+        Gradient g = new Gradient();
+        g.SetKeys(
+            new[]
+            {
+                new GradientColorKey(a, 0f),
+                new GradientColorKey(b, 0.5f),
+                new GradientColorKey(c, 1f),
+            },
+            new[]
+            {
+                new GradientAlphaKey(1f, 0f),
+                new GradientAlphaKey(1f, 1f),
+            });
+        return g;
+    }
+}

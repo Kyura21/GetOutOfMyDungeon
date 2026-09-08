@@ -26,6 +26,10 @@ public class SkullAimController : MonoBehaviour
     public State CurrentState { get; private set; } = State.Idle;
     public Vector3 ShotDirection => shotDirection;
 
+    // per la barra di potenza della UI: 0..1 sulla scala di maxPower
+    public float CurrentPower => currentPower;
+    public float PowerRatio => maxPower > 0f ? currentPower / maxPower : 0f;
+
     private Vector3 shotDirection;
     private float currentPower;
     private float powerTimer;
@@ -90,6 +94,7 @@ public class SkullAimController : MonoBehaviour
                 {
                     CurrentState = State.Powering;
                     powerTimer = 0f;
+                    currentPower = 0f;  // la barra parte da zero, non dal tiro precedente
                 }
                 break;
 

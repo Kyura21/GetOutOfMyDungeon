@@ -29,6 +29,7 @@ Legenda delle colonne:
 | `Hole_opener`, `Hole_opener (1)` | `HoleOpener` — bersagli che aprono la buca |
 | `Game_Manager` | `GameManager` — obiettivi del livello, sconfitta, punteggi |
 | `Lava` | `KillZone` — morte istantanea |
+| `HUD` (Canvas) | `HUDController` — barre, contatori, pannelli di fine livello |
 | `Skeletal_arm` | nessuno script proprio: lo muove `SkullAimController` |
 | `Arrow` → `Directional_arrow` | `Animation` legacy con `Pointing.anim`; posizione gestita da `SkullAimController` |
 
@@ -356,6 +357,55 @@ Va poi elencato in `GameManager.requiredPuzzles` per diventare un obiettivo.
 
 ---
 
+## 12-bis. L'HUD — `HUDController`
+
+`Assets/Script/UI/HUDController.cs` — sul Canvas `HUD`.
+
+Solo visualizzazione: legge lo stato e lo disegna, non decide niente e non modifica niente.
+Lo stato di fine livello viene **letto ogni frame** invece che agganciato a `onWin`/`onLose`,
+così non c'è niente da ricollegare nell'Inspector e l'HUD funziona anche se lo aggiungi
+a livello già avviato.
+
+Tutti i riferimenti sono **opzionali**: quelli lasciati vuoti vengono saltati.
+Si può quindi tenere un HUD ridotto senza toccare il codice.
+
+### Generazione
+
+Menu **`GOOMD > Crea HUD in scena`** (`Assets/Script/UI/Editor/HUDBuilder.cs`): costruisce
+tutta la gerarchia già cablata. Da lì in poi si modifica normalmente nell'Inspector,
+lo script non serve più. Richiede le **TMP Essential Resources** importate
+(`Window > TextMeshPro > Import TMP Essential Resources`); se mancano avvisa e si ferma.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `gameManager`, `skull`, `aim` | vuoti | Riferimenti di gioco. Vuoti = cercati in scena in `Awake()`. Lasciali vuoti. |
+| `integrityBar` / `integrityFill` | — | Lo `Slider` della barra vitale e l'`Image` del Fill, colorata dal gradiente. |
+| `integrityGradient` | rosso → giallo → verde | Colore della barra in funzione dell'integrità residua. |
+| `integrityFormat` | `{0:0}%` | Formato della percentuale. |
+| `integritySmooth` | 8 | Velocità con cui la barra insegue il valore reale. `0` = salta di scatto. **La percentuale scritta non è smussata**: su una barra vitale leggere 12% mentre sei a 8% sarebbe una bugia. |
+| `lowIntegrityThreshold` | 0.25 | Sotto questa frazione la barra pulsa. È l'unico avviso che il teschio sta per rompersi, cioè che stai per perdere. |
+| `lowIntegrityPulseSpeed` | 4 | Velocità del lampeggio. `0` lo disattiva. Usa `Time.unscaledTime`: continua a pulsare anche a gioco in pausa. |
+| `powerRoot` | — | Il gruppo della barra di potenza: acceso solo mentre serve. |
+| `showWhileAiming` | true | Mostra la barra a zero già in stato `Aiming`, così non compare di colpo al primo click. |
+| `powerGradient` | giallo → arancio → rosso | Colore della barra di potenza. |
+| `damageFormat` | `{0:n0}` | Formato del punteggio danni (separatore delle migliaia). |
+| `damageRollSpeed` | 6 | Velocità con cui il contatore rincorre il valore vero, stile Burnout. `0` = salto secco. Sul pannello finale viene comunque allineato al totale reale. |
+| `powerCurrencyFormat` | `POWER {0}` | Formato del contatore di valuta. |
+| `enemiesFormat` | `NEMICI {0} / {1}` | `{0}` = uccisi, `{1}` = totale a inizio livello (`GameManager.EnemiesAtStart`). |
+| `holeIndicator` | — | GameObject acceso quando la buca si apre. Serve a far capire che gli `HoleOpener` hanno funzionato. |
+| `winPanel` / `losePanel` | — | Pannelli di fine livello, spenti in `Start()`. |
+| `statsFormat` | `Danni {0:n0}   Power {1}` | Riepilogo mostrato su entrambi i pannelli. |
+
+`RestartLevel()` è pubblica e ricarica la scena corrente: il generatore la collega già al
+bottone **RIGIOCA** di entrambi i pannelli. È l'unica cosa cliccabile dell'HUD — tutto il
+resto ha `raycastTarget` spento per non rubare i click alla camera in Explore.
+
+> **Se i bottoni non rispondono**: controlla l'`EventSystem` creato in scena. Ha un
+> `InputSystemUIInputModule` (il progetto usa il new Input System); se il campo delle
+> azioni è vuoto, premi *Assign Default Actions* nell'Inspector del componente.
+
+---
+
 ## 13. La fisica non-script
 
 Cose che non stanno in nessuno script ma pesano quanto i parametri sopra.
@@ -444,9 +494,9 @@ produce bug silenziosi, non errori di compilazione.
 
 Aperte, da tenere presenti quando si progetta il bilanciamento:
 
-- **Nessuna UI** per integrità, HP, Power, Danni e barra di potenza — al momento la
-  taratura si verifica solo guardando l'Inspector in Play.
 - **`explosionVFX`, `deathVFX`, `triggeredVFX` non assegnati.**
+- **HUD senza stile**: rettangoli pieni e font di default. Manca anche la UI degli HP
+  dei singoli nemici (per ora il feedback è solo il flash rosso).
 - **Sistema di potenziamenti** non progettato: il Power si accumula ma non si spende.
 - **Puzzle veri** non progettati: `PuzzleTrigger` è solo l'aggancio.
 - **Nemici senza AI**: bersagli fermi.

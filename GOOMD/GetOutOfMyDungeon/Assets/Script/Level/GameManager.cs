@@ -42,6 +42,11 @@ public class GameManager : MonoBehaviour
     public WinReason LastWinReason { get; private set; } = WinReason.None;
     public string LastLoseReason { get; private set; }
 
+    // quanti nemici c'erano all'inizio: EnemyHealth.All si svuota man mano che
+    // muoiono, quindi il totale va fotografato una volta sola. Serve alla UI
+    // per scrivere "2 / 3" e servira' al punteggio finale.
+    public int EnemiesAtStart { get; private set; }
+
     private bool hasObjectives;
 
     void Awake()
@@ -58,6 +63,7 @@ public class GameManager : MonoBehaviour
         // scena non ce n'e' nessuno: altrimenti il livello si vince da solo
         // al primo frame.
         int enemies = EnemyHealth.AliveCount;
+        EnemiesAtStart = enemies;
 
         hasObjectives = (requireAllEnemiesDead && enemies > 0)
                         || requiredDamage > 0
