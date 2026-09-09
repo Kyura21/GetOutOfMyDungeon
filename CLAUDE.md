@@ -50,8 +50,19 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   `SkullAimController`.
 - `Player/SkullIntegrity.cs` — HP del teschio, si consumano **per metro percorso**,
   con moltiplicatore crescente man mano che si rovina.
-- `Enemy/EnemyHealth.cs` — HP impostabili, registro statico `All` / `AliveCount`
-  (aggiornato in `OnEnable`/`OnDisable`), flash rosso sul colpo, `powerReward`.
+- `Enemy/EnemyHealth.cs` — HP impostabili, registro statico `All` / `AliveCount`.
+  `deathBehaviour`: `Destroy` / `Deactivate` / **`Wreck`** (il corpo resta in scena).
+  Ottimizzato per le folle: `AliveCount` e' un contatore mantenuto, non una
+  scansione (lo leggono ogni frame GameManager e HUD); il registro si toglie in
+  tempo costante scambiando l'ultimo elemento; il flash rosso usa un
+  `MaterialPropertyBlock` (niente materiale istanziato per nemico) dentro una
+  coroutine, quindi **non c'e' nessun `Update` sui nemici**.
+- `Enemy/EnemyWreck.cs` — al primo colpo il corpo esce dai binari e diventa un
+  birillo: rotola, ingombra, spinge e **danneggia gli altri nemici urtandoli**.
+  E' il pezzo che produce le carambole. Danneggia solo mentre e' libero,
+  altrimenti il traffico si autodistruggerebbe negli ingorghi. Il numero di
+  rottami contemporanei ha un tetto (`GameManager.maxWrecks`): e' il costo
+  dominante quando la scena si riempie.
 - `Enemy/EnemyArmor.cs` — corazza direzionale (cono attorno a `forward`) e/o soglia
   di velocita'. Il colpo bloccato **non fa esplodere** il teschio: rimbalza.
   Il controllo lo fa `SkullExplosion` prima di esplodere, non un `OnCollisionEnter`

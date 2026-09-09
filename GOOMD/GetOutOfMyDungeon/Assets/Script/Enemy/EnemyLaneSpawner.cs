@@ -102,6 +102,7 @@ public class EnemyLaneSpawner : MonoBehaviour
         public GameObject go;
         public EnemyHealth health;
         public Rigidbody rb;
+        public EnemyWreck wreck;
         public int lane;
         public float t;        // 0 = testa della corsia, 1 = fondo
         public float speed;    // sua, non della corsia: ognuno va per conto proprio
@@ -308,12 +309,14 @@ public class EnemyLaneSpawner : MonoBehaviour
         {
             if (other.go == null) continue;
 
+            // Knock() fa piu' che renderlo dinamico: lo iscrive al registro dei
+            // rottami, che ne limita il numero e ne decide la durata
+            if (other.wreck != null) other.wreck.Knock();
+            else if (other.rb != null) other.rb.isKinematic = false;
+
             if (other.rb != null)
-            {
-                other.rb.isKinematic = false;
                 other.rb.AddExplosionForce(crashImpulse, at, crashRadius, crashUpwards,
                                            ForceMode.Impulse);
-            }
 
             if (crashDamage > 0 && other.health != null)
                 other.health.TakeDamage(crashDamage);
@@ -322,6 +325,7 @@ public class EnemyLaneSpawner : MonoBehaviour
             other.go = null;
             other.health = null;
             other.rb = null;
+            other.wreck = null;
             other.retired = true;
         }
     }
@@ -408,6 +412,7 @@ public class EnemyLaneSpawner : MonoBehaviour
         r.go = Instantiate(prefab, LanePoint(laneIndex, t), rotation, transform);
         r.health = r.go.GetComponent<EnemyHealth>();
         r.rb = r.go.GetComponent<Rigidbody>();
+        r.wreck = r.go.GetComponent<EnemyWreck>();
 
         // sui binari finche' e' vivo: un corpo dinamico spostato a mano
         // combatte col solver
@@ -444,7 +449,8 @@ public class EnemyLaneSpawner : MonoBehaviour
         {
             // se muore mentre e' ancora sui binari va restituito alla fisica,
             // altrimenti l'esplosione non lo sposta
-            if (r.rb != null) r.rb.isKinematic = false;
+            if (r.wreck != null) r.wreck.Knock();
+            else if (r.rb != null) r.rb.isKinematic = false;
 
             // la distruzione la gestisce EnemyHealth (destroyOnDeath/deathDelay)
             if (respawnDelay < 0f) r.retired = true;
@@ -459,6 +465,7 @@ public class EnemyLaneSpawner : MonoBehaviour
         r.go = null;
         r.health = null;
         r.rb = null;
+        r.wreck = null;
 
         if (killed) TriggerCrash(r.lane, at);
     }

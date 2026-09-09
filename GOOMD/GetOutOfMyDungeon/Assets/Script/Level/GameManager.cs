@@ -26,6 +26,11 @@ public class GameManager : MonoBehaviour
     [Header("Condizioni di sconfitta")]
     public float fallY = -20f;     // rete di sicurezza sotto il livello
 
+    [Header("Prestazioni")]
+    // quanti corpi liberi (EnemyWreck) possono convivere: oltre il tetto
+    // sparisce il piu' vecchio. 0 = nessun limite
+    public int maxWrecks = 60;
+
     [Header("Eventi")]
     public UnityEvent onWin;
     public UnityEvent onLose;

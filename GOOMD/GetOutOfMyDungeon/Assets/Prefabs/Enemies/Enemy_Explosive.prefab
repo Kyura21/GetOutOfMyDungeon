@@ -158,7 +158,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a978221620f5e454a95eb51ad48f7b75, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyHealth
-  maxHP: 3
+  maxHP: 2
   powerReward: 1
   damageScorePerHP: 100
   damageScoreOnKill: 250

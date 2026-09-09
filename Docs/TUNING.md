@@ -236,15 +236,43 @@ per l'obiettivo "uccidi tutti".
 | `powerReward` | 1 | 1 | **Power** guadagnato uccidendolo: è la *valuta* per i potenziamenti futuri. Non è mai un obiettivo di livello. Qui vanno differenziati i nemici (un boss dà di più). |
 | `damageScorePerHP` | 100 | 100 | Punteggio **Danni** per ogni HP effettivamente tolto. "Effettivamente" conta: un colpo da 5 su un nemico con 2 HP residui vale 2, non 5, così l'ultimo colpo non gonfia il punteggio. |
 | `damageScoreOnKill` | 250 | 250 | Bonus Danni alla morte. Un nemico standard vale quindi `3 × 100 + 250 = 550` punti totali. |
-| `deathVFX` | vuoto | vuoto | Prefab alla morte, distrutto dopo 2 s (costante nel codice). **Da assegnare.** |
-| `deathDelay` | 0 | **0.1** | Ritardo prima di sparire, per far vedere il VFX. |
-| `destroyOnDeath` | true | true | `true` distrugge il GameObject; `false` lo disattiva soltanto — necessario se vuoi poter fare restart del livello senza ricaricare la scena. |
+| `deathVFX` | vuoto | vuoto | Prefab alla morte, distrutto dopo 2 s (costante nel codice). Puoi usare quello generato da `GOOMD > Crea VFX esplosione`. |
+| `deathDelay` | 0 | **0.1** | Ritardo prima di sparire, per far vedere il VFX. Ignorato in modalità `Wreck`. |
+| `deathBehaviour` | Destroy | Destroy | Cosa resta del nemico morto. **`Destroy`** = sparisce. **`Deactivate`** = resta spento in scena, pronto per essere riusato in un restart. **`Wreck`** = il corpo **rimane in gioco come ostacolo fisico**, ed è la modalità da usare per il traffico in stile Burnout. Vuole un `EnemyWreck` sull'oggetto, che è quello che lo rende dinamico e ne limita la durata. |
 | `flashOnHit` | true | true | Lampeggio di colore al colpo. |
 | `flashColor` | rosso | rosso | Colore del lampeggio. |
 | `flashDuration` | 0.15 | 0.15 | Durata in secondi. Sotto 0,1 quasi non si vede; sopra 0,4 sembra un bug. |
 
-> Il flash scrive su `renderer.material.color`, quindi **istanzia il materiale** per ogni
-> nemico. Va bene con pochi nemici; con decine servirà un `MaterialPropertyBlock`.
+Il flash usa un `MaterialPropertyBlock` e gira dentro una coroutine avviata al colpo:
+niente materiale istanziato per nemico e nessun `Update` che scatti a vuoto sessanta volte
+al secondo per ognuno. Sono le due cose che rendono sostenibili le folle.
+
+### `EnemyWreck` — il corpo come birillo
+
+`Assets/Script/Enemy/EnemyWreck.cs`. Richiede `Rigidbody`.
+
+Al primo colpo incassato il nemico **esce dai binari** e diventa un corpo fisico libero:
+rotola, ingombra, spinge gli altri e li **danneggia urtandoli**. È il pezzo che produce le
+carambole — le auto distrutte di Burnout che restano in mezzo alla strada. Non serve che
+muoia: vale anche da vivo.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `knockOnDamage` | true | Basta un colpo incassato per liberarlo. È quasi sempre quello che vuoi. |
+| `knockOnDeath` | true | Lo libera anche alla morte, per i casi in cui muore senza passare da un colpo (danno da esplosione a catena, `crashDamage`). |
+| `impactDamage` | 1 | Danno che infligge ad **altri nemici** urtandoli. `0` = ingombra soltanto, senza far male. È il moltiplicatore della catena: alzalo e un solo tiro può azzerare una corsia. |
+| `minImpactSpeed` | 4 | Sotto questa velocità d'urto è solo una spinta. Tienila alta abbastanza da non far danno mentre rotola pigramente addosso a qualcuno. |
+| `impactCooldown` | 0.2 | Pausa fra un urto utile e il successivo, così un contatto strisciante non applica danno a ogni frame. |
+| `impactScore` | 50 | Punti Danni per l'urto in sé. Il punteggio degli HP tolti lo aggiunge già `TakeDamage`: questo è il premio per il tamponamento, come in Burnout. |
+| `lifetime` | -1 | Secondi di vita del rottame. **`-1` = resta finché il tetto globale lo consente**, ed è la scelta giusta se vuoi che i rottami siano ostacoli permanenti. |
+
+> Un rottame **danneggia solo mentre è libero**: un nemico ancora sui binari non fa male a
+> nessuno, altrimenti il traffico si autodistruggerebbe da solo negli ingorghi.
+
+> **Il tetto ai rottami è `GameManager.maxWrecks`** (default 60, `0` = nessun limite).
+> Superato, sparisce il più vecchio — che è anche quello più probabilmente lontano
+> dall'azione. Senza tetto, una strada trafficata piena di rottami diventa in fretta un
+> simulatore di fisica: è l'unico numero che davvero protegge il frame rate.
 
 ---
 
@@ -475,6 +503,7 @@ La strada si regola a occhio senza entrare in Play, e i waypoint si possono spos
 | `requiredDamage` | 0 | **10** | Soglia di punteggio Danni da raggiungere. `0` = non è un obiettivo. |
 | `requiredPuzzles` | vuoto | vuoto | Lista di `PuzzleTrigger` che devono essere risolti. Vuoto = nessun puzzle richiesto. |
 | `countDamageAfterWin` | false | false | Se continuare a contare i danni dopo la fine del livello. Utile per lasciar godere l'esplosione finale senza congelare il contatore. |
+| `maxWrecks` | 60 | 60 | Quanti corpi liberi (`EnemyWreck`) possono convivere. Oltre il tetto sparisce il più vecchio. `0` = nessun limite. È la leva principale contro il calo di frame rate quando la scena si riempie di rottami. |
 | `fallY` | -20 | -20 | Quota sotto la quale il teschio è considerato "fuori mappa" e il livello è perso. È una **rete di sicurezza** generica: le morti volute vanno fatte con `KillZone`, che dà un messaggio sensato. Tienilo sotto il punto più basso calpestabile del livello, con un buon margine. |
 
 > **`requiredDamage = 10` è di fatto già soddisfatto**: `damageScorePerHP` è 100, quindi
@@ -688,6 +717,48 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 
 ---
 
+## 13-bis. Prestazioni: reggere il caos
+
+L'obiettivo dichiarato è **tanti oggetti in scena insieme**. Ecco cosa è già stato fatto
+perché regga, e cosa resta da fare quando i numeri cresceranno ancora.
+
+### Già fatto
+
+- **Nessun materiale istanziato per nemico.** Il flash al colpo passa da un
+  `MaterialPropertyBlock` e legge il colore base da `sharedMaterial`. Leggere
+  `renderer.material` avrebbe creato una copia del materiale per ogni nemico, moltiplicando
+  memoria e draw call.
+- **Nessun `Update` sui nemici.** Il lampeggio gira in una coroutine avviata al colpo e si
+  spegne da solo. Un `Update` vuoto per centinaia di oggetti si paga comunque, perché ogni
+  chiamata attraversa il confine fra motore e codice gestito.
+- **`EnemyHealth.AliveCount` è un contatore, non una scansione.** Lo leggono ogni frame sia
+  il `GameManager` sia l'HUD: ricalcolarlo scorrendo la lista sarebbe stato due passate
+  complete al frame. Il registro si toglie in tempo costante scambiando l'ultimo elemento
+  al posto di quello rimosso, invece di far scorrere la coda.
+- **Tetto ai rottami** (`GameManager.maxWrecks`): il numero di Rigidbody dinamici
+  contemporanei è il costo dominante, ed è quello che ora ha un limite.
+- **Durata dei rottami** senza `Update`: la fa scadere `Destroy(go, lifetime)`.
+- **Il percorso dello spawner non alloca**: viene ricostruito a ogni passo di fisica ma
+  riusando le stesse liste.
+
+### Da fare quando servirà
+
+1. **Pooling dei nemici nello spawner.** Oggi ogni comparsa è un `Instantiate` e ogni
+   sparizione in fondo alla corsia un `Destroy`. A poche unità al secondo non è un problema
+   — il costo vero sono gli oggetti *contemporanei*, non il ricambio — ma se alzerai molto
+   la cadenza sarà la prima cosa da cambiare. Attenzione: riusare le istanze obbliga a
+   ripulire gli ascoltatori aggiunti a runtime su `onDied`/`onDamaged`, altrimenti si
+   accumulano a ogni riuso.
+2. **GPU Instancing sui materiali dei nemici.** Con il `MaterialPropertyBlock` già in uso,
+   basta spuntare *Enable GPU Instancing* sul materiale perché le copie collassino in poche
+   draw call.
+3. **Far dormire i rottami fermi.** PhysX li addormenta da solo quando si fermano; se non
+   succede, di solito è perché qualcosa li tocca di continuo.
+4. **Collider più semplici.** Box e capsule costano molto meno delle mesh: i rottami sono
+   il posto dove conviene di più.
+
+---
+
 ## 14. Ricettario: "voglio ottenere X"
 
 | Voglio... | Tocco |
@@ -715,6 +786,9 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 | Vedere il traffico formarsi da zero | `startPopulated` **off** (default) |
 | Un colpo, un nemico morto | `SkullExplosion.explosionDamage` ≥ `EnemyHealth.maxHP` |
 | La palla non attraversa i nemici | Collision Detection **Continuous Dynamic** sul teschio |
+| I corpi colpiti restano come ostacoli | `EnemyWreck` sul prefab + `deathBehaviour` = `Wreck` |
+| Carambole più devastanti | `EnemyWreck.impactDamage` ↑ e `minImpactSpeed` ↓ |
+| Il frame rate regge con molti rottami | `GameManager.maxWrecks` ↓, oppure `EnemyWreck.lifetime` ≥ 0 |
 | Una corsia bloccata per sempre dal primo colpo | `crashRecovery` = -1 |
 
 ---
@@ -764,6 +838,7 @@ Aperte, da tenere presenti quando si progetta il bilanciamento:
 - **`explosionVFX`, `deathVFX`, `triggeredVFX` non assegnati.**
 - **HUD senza stile**: rettangoli pieni e font di default. Manca anche la UI degli HP
   dei singoli nemici (per ora il feedback è solo il flash rosso).
+- **Pooling dei nemici** non implementato: vedi capitolo 13-bis.
 - **Sistema di potenziamenti** non progettato: il Power si accumula ma non si spende.
 - **Puzzle veri** non progettati: `PuzzleTrigger` è solo l'aggancio.
 - **Nemici senza AI reattiva**: pattugliano un percorso fisso, ma non inseguono né
