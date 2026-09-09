@@ -75,11 +75,18 @@ public class EnemyLaneSpawner : MonoBehaviour
     public bool faceTravelDirection = true;
     public float respawnDelay = 3f;   // attesa in piu' dopo un'uccisione. < 0 = posto perso
 
+    [Header("Avvio")]
+    // false = si parte a strada vuota e il flusso si forma da solo dalla testa
+    public bool startPopulated = false;
+
     [Header("Quanti in tutto")]
     public int totalSpawnBudget = -1;  // -1 = illimitato. Vale su tutte le corsie insieme
 
     [Header("Incidente")]
-    public bool stopLaneOnCrash = true;   // uccidere un nemico blocca la sua corsia
+    public bool stopLaneOnCrash = true;   // colpire un nemico blocca la sua corsia
+    // l'incidente scatta al colpo, non alla morte: in Burnout ci si schianta,
+    // non si aspetta che il bersaglio muoia
+    public bool crashOnHit = true;
     public float crashImpulse = 8f;       // spinta sugli altri nemici della corsia
     public float crashRadius = 6f;
     public float crashUpwards = 0.5f;
@@ -146,13 +153,22 @@ public class EnemyLaneSpawner : MonoBehaviour
                 {
                     Runner r = new Runner { lane = i };
 
-                    // la corsia parte gia' popolata, a distanza costante: la
-                    // cadenza irregolare regola solo chi arriva dopo
-                    r.t = Mathf.Repeat((float)k / n + lanes[i].phase, 1f);
+                    if (startPopulated)
+                    {
+                        // corsia gia' piena, nemici a distanza costante: la
+                        // cadenza regola solo chi arriva dopo
+                        r.t = Mathf.Repeat((float)k / n + lanes[i].phase, 1f);
 
-                    // se il budget e' piu' stretto del traffico, la corsia
-                    // parte incompleta invece di sforare
-                    if (!TrySpawn(i, r, r.t)) r.retired = true;
+                        // se il budget e' piu' stretto del traffico, la corsia
+                        // parte incompleta invece di sforare
+                        if (!TrySpawn(i, r, r.t)) r.retired = true;
+                    }
+                    else
+                    {
+                        // strada vuota: escono dalla testa uno per volta e il
+                        // flusso si forma sotto gli occhi del giocatore
+                        r.timer = Stagger(lanes[i], k);
+                    }
 
                     list.Add(r);
                 }
@@ -259,14 +275,22 @@ public class EnemyLaneSpawner : MonoBehaviour
         {
             list[k].retired = false;
             list[k].t = 0f;
-            list[k].timer = SpawnWait(lanes[laneIndex]) * (k + 1);
+            list[k].timer = Stagger(lanes[laneIndex], k);
         }
 
         return true;
     }
 
-    // Un nemico ucciso sulla corsia manda in frantumi la fila: gli altri
-    // vengono spazzati via e il traffico si ferma, come un tamponamento.
+    void OnRunnerDamaged(Runner r)
+    {
+        if (!crashOnHit || r.go == null) return;
+
+        TriggerCrash(r.lane, r.go.transform.position);
+    }
+
+    // Un nemico colpito sulla corsia manda in frantumi la fila: tutti quelli
+    // di quella corsia, lui compreso, escono dai binari e vengono spazzati via,
+    // e il traffico si ferma. Come un tamponamento.
     void TriggerCrash(int laneIndex, Vector3 at)
     {
         if (!stopLaneOnCrash) return;
@@ -389,10 +413,16 @@ public class EnemyLaneSpawner : MonoBehaviour
         // combatte col solver
         if (r.rb != null) r.rb.isKinematic = true;
 
-        // lo libero nell'istante in cui muore, non al prossimo FixedUpdate:
-        // l'onda d'urto che lo ha ucciso deve poterlo ancora spedire via
         if (r.health != null)
+        {
+            // lo libero nell'istante in cui muore, non al prossimo FixedUpdate:
+            // l'onda d'urto che lo ha ucciso deve poterlo ancora spedire via
             r.health.onDied.AddListener(() => Retire(r, true));
+
+            // basta un colpo incassato per mandare in frantumi la fila: non
+            // serve che il bersaglio muoia
+            r.health.onDamaged.AddListener(() => OnRunnerDamaged(r));
+        }
 
         SpawnedTotal++;
         spawnedPerLane[laneIndex]++;
@@ -439,6 +469,21 @@ public class EnemyLaneSpawner : MonoBehaviour
 
         return lane.spawnInterval * Random.Range(1f - lane.intervalVariation,
                                                  1f + lane.intervalVariation);
+    }
+
+    // Scaglionamento di una fila che parte da zero: il primo esce subito, gli
+    // altri a ruota. Senza spawnInterval uso il tempo che serve a liberare la
+    // distanza di sicurezza, altrimenti uscirebbero tutti insieme e si
+    // ammasserebbero sulla testa della corsia.
+    float Stagger(Lane lane, int index)
+    {
+        if (lane == null || index <= 0) return 0f;
+
+        float step = lane.spawnInterval > 0f
+            ? SpawnWait(lane)
+            : (lane.minGap > 0f ? lane.minGap / Mathf.Max(lane.speed, 0.01f) : 0.5f);
+
+        return step * index;
     }
 
     bool HasBudget(int laneIndex)

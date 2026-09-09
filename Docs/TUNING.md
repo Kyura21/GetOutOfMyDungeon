@@ -205,6 +205,21 @@ una volta sola per partita.
 > Se l'intenzione è "un colpo, un nemico morto", servono `explosionDamage ≥ 3` oppure
 > `maxHP = 2`. Se invece l'intenzione è costringere a due passaggi, va bene così —
 > ma è bene che sia una scelta, non un caso.
+>
+> È la spiegazione più frequente di *"colpisco un nemico e non succede niente"*: non
+> muore, quindi non viene restituito alla fisica, quindi non vola via e — se è su una
+> corsia — continua indisturbato. Da qui `EnemyLaneSpawner.crashOnHit`, che fa scattare
+> l'incidente sul colpo invece che sulla morte.
+
+> **Se il teschio sembra attraversare i nemici**: il Rigidbody del teschio ha
+> `Collision Detection = Discrete`. A 20 m/s con passo fisico di 0,02 s la palla avanza
+> **40 cm per passo**, abbastanza da saltare a piè pari un nemico stretto. Metti
+> **Continuous Dynamic** sul teschio (e **Continuous Speculative** sui nemici cinematici,
+> che è l'unica modalità continua ammessa per loro).
+
+> **Se l'esplosione non si vede**: `explosionVFX` non è assegnato. L'esplosione avviene
+> lo stesso — danno, spinta, punteggio — ma non produce nessuna immagine, e con
+> `freezeSkullOnExplode` acceso l'unico segnale è il teschio che si ferma di colpo.
 
 ---
 
@@ -334,14 +349,16 @@ scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 | `centerLanes` | true | Le corsie stanno a cavallo della linea centrale invece di partire da essa. |
 | `enemyPool` | vuoto | **Il sacchetto da cui si pesca il tipo di nemico**: una voce per tipo, ognuna con un `prefab` e un `weight`. Peso 3 contro peso 1 significa che esce il triplo delle volte. Con una sola voce lo spawner genera sempre lo stesso nemico. |
 | `faceTravelDirection` | true | I nemici guardano nel verso di marcia. |
-| `respawnDelay` | 3 | Secondi prima che il posto di un nemico **ucciso** venga ripreso. **`-1` = quel posto resta vuoto.** Non riguarda chi arriva in fondo: quello è rimpiazzato subito. |
+| `respawnDelay` | 3 | Attesa **in più** prima che il posto di un nemico ucciso venga ripreso, sommata alla cadenza della corsia. **`-1` = quel posto resta vuoto per sempre.** |
+| `startPopulated` | false | `false` = si parte a **strada vuota** e il flusso si forma sotto gli occhi del giocatore, uno alla volta dalla testa della corsia. `true` = la corsia è già piena al primo frame, con i nemici distribuiti secondo `phase`. Con `false` il campo `phase` non ha effetto. |
 | `totalSpawnBudget` | -1 | **Quanti nemici passeranno in tutto**, su tutte le corsie insieme. `-1` = infiniti. Finito il budget la strada si svuota e non ne arrivano più. |
 
 ### L'incidente
 
 | Campo | Default | Cosa fa |
 |---|---|---|
-| `stopLaneOnCrash` | true | Uccidere un nemico manda in frantumi la sua corsia: gli altri vengono **spazzati via** e il traffico si ferma. Spegnilo per tornare al comportamento di prima, dove la fila prosegue indifferente. |
+| `stopLaneOnCrash` | true | Colpire un nemico manda in frantumi la sua corsia: **tutti** quelli di quella corsia, lui compreso, escono dai binari, vengono spazzati via e il traffico si ferma. Spegnilo per tornare a una fila che prosegue indifferente. |
+| `crashOnHit` | true | L'incidente scatta al **colpo incassato**, non alla morte. È quasi sempre quello che vuoi: in Burnout ci si schianta, non si aspetta che il bersaglio muoia — e con un `explosionDamage` più basso degli HP del nemico, aspettare la morte significherebbe non vedere mai un incidente. Spegnendolo serve un'uccisione vera. |
 | `crashImpulse` | 8 | Spinta data agli altri nemici della corsia, come impulso dal punto dell'uccisione. |
 | `crashRadius` | 6 | Raggio entro cui la spinta si fa sentire: oltre, il nemico esce comunque dai binari ma quasi non si muove. |
 | `crashUpwards` | 0.5 | Quanto la spinta va verso l'alto. Alto = tamponamento spettacolare, corpi in aria. |
@@ -350,7 +367,9 @@ scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 
 Solo la corsia colpita si ferma: le altre continuano. Gli spazzati via **non vengono più
 guidati**: da quel momento li muove solo la fisica, quindi possono finire in mezzo alle
-altre corsie o addosso al teschio.
+altre corsie o addosso al teschio. Restano vivi e colpibili — sono ancora punti — ma per
+questo **non spariscono da soli**: con traffico continuo e molti incidenti i rottami si
+accumulano nel livello.
 
 ### Impostazioni per corsia
 
@@ -375,8 +394,11 @@ Ogni nemico compare in **testa** alla corsia (che è `pointA` o `pointB` a secon
 ripreso. Il tipo viene **ripescato a ogni comparsa**, quindi la composizione del traffico
 cambia da sola nel tempo.
 
-La corsia **parte già popolata**, con i nemici a distanza costante secondo `phase`: la
-cadenza regola solo chi arriva dopo, così il livello non comincia con una strada vuota.
+Di default la corsia **parte vuota** e si riempie da sola: il primo nemico esce subito, gli
+altri a ruota secondo la cadenza. Senza `spawnInterval` lo scaglionamento usa il tempo che
+serve a liberare `minGap`, altrimenti uscirebbero tutti insieme e si ammasserebbero sulla
+testa della corsia. Con `startPopulated` acceso, invece, la strada è già trafficata al
+primo frame.
 
 Il percorso è misurato per **lunghezza d'arco**, quindi la velocità resta costante anche
 dove la curva è stretta. Le corsie laterali sono un po' più lunghe o più corte della linea
@@ -690,6 +712,9 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 | Una strada curva | aggiungi `waypoints` fra A e B, `smoothPath` acceso |
 | Traffico irregolare | `spawnInterval` ↑ e `intervalVariation` ↑ |
 | L'incidente fa punti | `crashDamage` > 0 (ma facilita `requiredKills`) |
+| Vedere il traffico formarsi da zero | `startPopulated` **off** (default) |
+| Un colpo, un nemico morto | `SkullExplosion.explosionDamage` ≥ `EnemyHealth.maxHP` |
+| La palla non attraversa i nemici | Collision Detection **Continuous Dynamic** sul teschio |
 | Una corsia bloccata per sempre dal primo colpo | `crashRecovery` = -1 |
 
 ---
