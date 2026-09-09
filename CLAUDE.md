@@ -24,11 +24,19 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
 |---|---|
 | `Game_Controller` | `SkullAimController` |
 | `Main Camera` | `CameraController` |
-| `Skull_player` | `SkullExplosion`, SphereCollider (physic mat `Skull_player`), Rigidbody |
+| `Skull_player` | `SkullExplosion` + `SkullRolling` + `SkullIntegrity`, SphereCollider (physic mat `Skull_player`), Rigidbody |
 | `Skeletal_arm` | la stecca (cue) |
 | `Arrow` | root vuoto, figlio `Directional_arrow` con `Animation` legacy + `Pointing.anim` (loop da solo) |
-| `Enemy` | cubo, tag `enemy`, BoxCollider + Rigidbody |
-| `Plane`, `Test_World`, `Global Volume`, `Directional Light` | ambiente |
+| `Game_Manager` | `GameManager` |
+| `HUD` (Canvas) | `HUDController` — generato da `GOOMD > Crea HUD in scena` |
+| `Enemy`, `Enemy (1)`, `Enemy (2)` | cubi, tag `enemy`, `EnemyHealth`, BoxCollider + Rigidbody |
+| `Win_hole` | `WinHole`, CapsuleCollider in trigger |
+| `Hole_opener`, `Hole_opener (1)` | `HoleOpener`, collegati in `WinHole.requiredOpeners` |
+| `Lava` | `KillZone` |
+| `wall`, `Plane`, `Test_World`, `Global Volume`, `Directional Light` | ambiente |
+
+Prefab in `Assets/Prefabs/`: `Enemies/Enemy_Absorber`, `Enemies/Enemy_Explosive`
+(tag `enemy`, `maxHP` 3). `VFX/` la crea `GOOMD > Crea VFX esplosione`.
 
 ## Script (`Assets/Script/`)
 
@@ -87,11 +95,22 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   corsia escono dai binari, vengono spinti via e il traffico si ferma per
   `crashRecovery`.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
-  `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
-  obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
+  `Kills`, `EnemiesAtStart`, `maxWrecks`, `fallY` come rete di sicurezza.
+  **Due vie di vittoria indipendenti** (OR): gli obiettivi in
+  `AreLevelObjectivesMet()` (nemici tutti e/o N + puzzle + soglia danni, in AND)
   oppure la buca. `LastWinReason` dice quale, servira' al punteggio.
   `hasObjectives`, calcolato in `Start()`, evita che un livello senza obiettivi
   configurati si vinca da solo al primo frame.
+- `UI/HUDController.cs` — HUD uGUI: barre di integrita' e potenza, contatori
+  Danni/Power/uccisioni, pannelli di fine livello. Solo visualizzazione: legge
+  `GameManager.State` ogni frame invece di agganciarsi a `onWin`/`onLose`, cosi'
+  non c'e' niente da ricollegare e gli `UnityEvent` restano liberi. Tutti i
+  riferimenti sono opzionali.
+- Editor (`*/Editor/`, fuori dalla build): `UI/Editor/HUDBuilder.cs` genera la
+  gerarchia dell'HUD gia' cablata, `Enemy/Editor/ExplosionVFXBuilder.cs` genera un
+  prefab di esplosione a particelle **mesh** (niente texture ne' trasparenze: in
+  URP sono la via piu' breve a un effetto invisibile o rosa). Entrambi dal menu
+  `GOOMD`.
 - `Level/WinHole.cs` — la buca da biliardo. Imbucare **vince da solo**, senza
   bisogno di aver ucciso o risolto niente (cambia solo il punteggio).
   Non chiama `Win()`: setta `IsPotted` e lascia decidere al `GameManager`.
@@ -136,10 +155,12 @@ innescare qualcos'altro — e la varieta' di quelle reazioni e' il gioco.
 Conseguenze pratiche:
 
 - Il punteggio **Damage** e' il punteggio principale della modalita'. Per ora lo
-  alimentano solo i nemici (`EnemyHealth` ed `EnemyExplosive`): quando ci saranno
-  oggetti di scena distruttibili dovranno chiamare `GameManager.AddDamage()`.
-  **Un componente per i props distruttibili non esiste ancora ed e' il pezzo
-  mancante piu' evidente.**
+  alimentano solo i nemici (`EnemyHealth`, `EnemyExplosive`, `EnemyWreck`): quando
+  ci saranno oggetti di scena distruttibili dovranno chiamare
+  `GameManager.AddDamage()`.
+- **Il corpo colpito resta in gioco** (`EnemyWreck`): rotola, ingombra e danneggia
+  chi urta. E' il principio delle auto distrutte di Burnout, che restano in strada
+  a innescare la carambola. Un nemico che sparisce e basta e' un'occasione persa.
 - Una reazione all'urto che non da' ne' punti ne' un vantaggio tattico e' fuori
   bersaglio: `EnemyArmor` respinge (e con `bounceKeep` > 1 rilancia), `EnemyAbsorber`
   rallenta, `EnemyExplosive` innesca la catena.
@@ -160,7 +181,7 @@ tipo `Destructible` che reagisce all'urto sopra una velocita' minima e chiama
   saranno la seconda fonte di valuta.
 - **Torce e simili** — applicano uno **stato** al teschio (prende fuoco).
 
-## Stati / potenziamenti del teschio (LA PROSSIMA COSA DA FARE)
+### Stati / potenziamenti del teschio
 
 Deciso dall'utente. Il teschio deve poter assumere degli stati che ne cambiano le
 proprieta' e il comportamento all'impatto. Esempi fatti: **ghiaccio**, **fuoco**,
@@ -171,11 +192,10 @@ Due vie di attivazione, entrambe previste:
 1. raccogliendo oggetti nel livello (le torce di cui sopra)
 2. acquistandoli con **Power** da un menu dei potenziamenti, ancora da progettare
 
-L'utente sta ancora decidendo i dettagli, ma la **struttura degli stati va fatta
-per prima**: e' il presupposto sia delle torce sia del negozio, ed e' oggi il
-pezzo mancante piu' importante. Va progettata in modo che uno stato possa
-toccare fisica (rimbalzo, attrito), integrita', danno e reazione all'impatto,
-visto che gli esempi coprono tutte e quattro le cose.
+L'utente sta ancora decidendo i dettagli. Vincolo emerso progettandolo: gli
+esempi coprono **quattro aree diverse** — fisica (rimbalzo, ghiaccio), integrita',
+danno (acido) e reazione all'impatto (tornado) — quindi la struttura va fatta in
+modo che uno stato possa intervenire su tutte e quattro, non su un parametro solo.
 
 Due contatori distinti, da non confondere:
 
@@ -186,24 +206,45 @@ Due contatori distinti, da non confondere:
   un obiettivo tramite `requiredDamage`. Per ora lo alimentano solo i nemici:
   quando ci saranno oggetti distruttibili, chiamano `GameManager.AddDamage()`.
 
-## Setup Unity
+## Come si lavora qui
 
-Completo dal 2026-09-08. In scena: `GameManager`, `KillZone` (su `Lava`),
-`SkullRolling` + `SkullIntegrity` + `SkullExplosion` sullo `Skull_player`,
-`SkullAimController`, `CameraController`, tre `EnemyHealth`, `Win_hole` con
-`WinHole` e due `Hole_opener` con `HoleOpener` (collegati in `requiredOpeners`).
-Manca solo `PuzzleTrigger`, che non ha ancora un meccanismo vero dietro.
+**Non c'e' nessuna CLI Unity disponibile: non posso compilare, ne' far girare il
+gioco.** Non dare mai per buono il codice nuovo: scrivilo, dillo esplicitamente e
+chiedi conferma all'utente, che compila e prova in editor. Finora ha sempre
+riportato l'esito, spesso segnalando comportamenti sbagliati piu' che errori.
 
-**Niente e' mai stato compilato in Unity in queste sessioni** (nessuna CLI Unity
-disponibile): chiedi conferma che compili prima di dare per buono il codice nuovo.
+**La taratura la fa l'utente.** I valori nel C# sono solo i default di creazione:
+comandano quelli serializzati in scena e nei prefab. Quando un comportamento
+sbagliato dipende da un numero, indica il campo e lascia fare a lui.
 
-## Aperti
+Aggiorna **`Docs/TUNING.md`** ogni volta che aggiungi o rinomini un campo
+pubblico: e' la wiki che l'utente usa per tarare.
 
-- Taratura di `wearPerMeter` (1 su 100 di integrita' = 100 m di rotolamento a livello:
-  molto stretto, da provare)
-- `explosionVFX` e `deathVFX` non assegnati
-- Sistema di potenziamenti da progettare
-- Puzzle veri da progettare (`PuzzleTrigger` e' solo l'aggancio)
-- Nessun prefab di nemico: gli archetipi sono componenti da comporre a mano,
-  e `EnemyLaneSpawner` un prefab lo vuole per forza
-- I nemici non reagiscono alla posizione del teschio: pattugliano e basta
+## Prossimi passi (in ordine)
+
+1. **Stati / potenziamenti del teschio** — la prossima cosa da fare, decisa
+   dall'utente. Progetto e vincoli sopra. E' il presupposto delle torce **e** del
+   negozio, quindi va prima di entrambi.
+2. **`Destructible`, il componente base dei props** — si rompe sopra una velocita'
+   minima e chiama `GameManager.AddDamage()`. Oggi il punteggio Danni lo alimentano
+   **solo i nemici**, e in una modalita' Crash e' meta' del punteggio che manca.
+   Casse e forzieri sono la sua versione piu' semplice, il boulder una variante che
+   infligge invece di subire.
+3. **Negozio dei potenziamenti** — il Power si accumula ma non si spende da
+   nessuna parte. Serve dopo gli stati, perche' e' quello che vende.
+4. **Puzzle veri** — `PuzzleTrigger` e' solo l'aggancio: nessun meccanismo lo chiama.
+5. **Restart di livello** — gli script hanno gia' i metodi (`ResetIntegrity`,
+   `ResetHealth`, `ResetExplosion`, `ResetHole`, `ResetOpener`, `ResetPuzzle`,
+   `ResetPatrol`, `ResetWreck`) ma **nessuno li chiama**: l'unico restart e'
+   `HUDController.RestartLevel()`, che ricarica la scena.
+6. **Stile dell'HUD** — funziona ma sono rettangoli pieni e font di default.
+7. **Pooling dei nemici nello spawner** — solo quando la cadenza salira' molto.
+   Vedi `Docs/TUNING.md` cap. 13-bis, con la trappola degli ascoltatori a runtime
+   da rimuovere a ogni riuso.
+
+Aperti minori:
+
+- I nemici non reagiscono alla posizione del teschio: pattugliano e basta.
+- Nessun suono, da nessuna parte.
+- `Collision Detection` e' Discrete su tutti i Rigidbody: col teschio a 20 m/s
+  sono 40 cm per passo di fisica, quindi puo' attraversare un bersaglio stretto.
