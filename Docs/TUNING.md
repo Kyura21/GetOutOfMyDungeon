@@ -322,23 +322,43 @@ Non ti ferma con gli HP ma con la fisica: si mangia gran parte della velocità d
 Una strada dal punto A al punto B divisa in N corsie parallele. I nemici compaiono in A,
 scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 
-### Impostazioni della strada
+### Il percorso
 
 | Campo | Default | Cosa fa |
 |---|---|---|
-| `pointA` / `pointB` | vuoti | Gli estremi della strada. Le corsie sono parallele alla linea A-B. |
+| `pointA` / `pointB` | vuoti | Inizio e fine della strada. |
+| `waypoints` | vuoto | Punti intermedi fra A e B: servono a **curvare** la strada. Vuoto = strada dritta. Sono in ordine, da A verso B. |
+| `smoothPath` | true | Fa passare una **curva** (Catmull-Rom) per i punti invece di spezzare ad angolo. Con soli A e B non cambia niente. La curva parte e finisce esattamente su A e B, ma **passa vicino** ai waypoint intermedi senza per forza toccarli. Spegnilo se vuoi angoli netti. |
+| `samplesPerSegment` | 8 | Quanti campioni per ogni tratto fra due punti. Più alti = curve più lisce e misure più precise, a costo trascurabile. Alzalo se una curva stretta appare spigolosa. |
 | `laneSpacing` | 2 | Distanza fra una corsia e l'altra, perpendicolare alla strada. |
-| `centerLanes` | true | Le corsie stanno a cavallo della linea A-B invece di partire da essa. |
+| `centerLanes` | true | Le corsie stanno a cavallo della linea centrale invece di partire da essa. |
 | `enemyPool` | vuoto | **Il sacchetto da cui si pesca il tipo di nemico**: una voce per tipo, ognuna con un `prefab` e un `weight`. Peso 3 contro peso 1 significa che esce il triplo delle volte. Con una sola voce lo spawner genera sempre lo stesso nemico. |
 | `faceTravelDirection` | true | I nemici guardano nel verso di marcia. |
 | `respawnDelay` | 3 | Secondi prima che il posto di un nemico **ucciso** venga ripreso. **`-1` = quel posto resta vuoto.** Non riguarda chi arriva in fondo: quello è rimpiazzato subito. |
 | `totalSpawnBudget` | -1 | **Quanti nemici passeranno in tutto**, su tutte le corsie insieme. `-1` = infiniti. Finito il budget la strada si svuota e non ne arrivano più. |
 
+### L'incidente
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `stopLaneOnCrash` | true | Uccidere un nemico manda in frantumi la sua corsia: gli altri vengono **spazzati via** e il traffico si ferma. Spegnilo per tornare al comportamento di prima, dove la fila prosegue indifferente. |
+| `crashImpulse` | 8 | Spinta data agli altri nemici della corsia, come impulso dal punto dell'uccisione. |
+| `crashRadius` | 6 | Raggio entro cui la spinta si fa sentire: oltre, il nemico esce comunque dai binari ma quasi non si muove. |
+| `crashUpwards` | 0.5 | Quanto la spinta va verso l'alto. Alto = tamponamento spettacolare, corpi in aria. |
+| `crashDamage` | 0 | Danno agli spazzati via. **`0` = solo spinta**, restano vivi e rotolano in giro come corpi fisici. Alzarlo trasforma l'incidente in una carambola che fa punti Danni e uccisioni — attenzione se il livello ha una quota `requiredKills`, perché diventa molto più facile. |
+| `crashRecovery` | 4 | Secondi prima che il traffico riparta, scaglionato. **`-1` = la corsia resta chiusa per sempre.** |
+
+Solo la corsia colpita si ferma: le altre continuano. Gli spazzati via **non vengono più
+guidati**: da quel momento li muove solo la fisica, quindi possono finire in mezzo alle
+altre corsie o addosso al teschio.
+
 ### Impostazioni per corsia
 
 | Campo | Default | Cosa fa |
 |---|---|---|
-| `enemyCount` | 3 | Quanti nemici percorrono la corsia **insieme**. È la densità del traffico. |
+| `enemyCount` | 3 | Quanti nemici percorrono la corsia **al massimo insieme**: sono i posti disponibili, non una garanzia. Con una cadenza lenta la corsia gira quasi sempre sotto capienza. |
+| `spawnInterval` | 1 | Pausa fra una comparsa e l'altra, in secondi. `0` = il posto viene ripreso subito, come prima. |
+| `intervalVariation` | 0.4 | Variazione della pausa: 0,4 = fra il 60% e il 140%. È quello che rende il traffico irregolare invece che a metronomo. |
 | `direction` | A→B | Il senso di marcia. Mettendo due corsie in versi opposti si ottengono le due carreggiate di una strada vera. |
 | `speed` | 2 | Velocità base della corsia, in metri al secondo. |
 | `speedVariation` | 0 | Variazione **per singolo nemico**: 0,3 significa che ognuno va fra il 70% e il 130% della velocità base, estratta alla comparsa. Rompe l'effetto processione e fa sì che il traffico si addensi e si diradi da solo. |
@@ -351,9 +371,18 @@ scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 ### Come funziona
 
 Ogni nemico compare in **testa** alla corsia (che è `pointA` o `pointB` a seconda di
-`direction`), la percorre e sparisce in fondo, dove ne compare subito un altro: la corsia
-resta piena finché c'è budget. Il tipo viene **ripescato a ogni comparsa**, quindi la
-composizione del traffico cambia da sola nel tempo.
+`direction`), la percorre e sparisce in fondo; dopo una pausa irregolare il posto viene
+ripreso. Il tipo viene **ripescato a ogni comparsa**, quindi la composizione del traffico
+cambia da sola nel tempo.
+
+La corsia **parte già popolata**, con i nemici a distanza costante secondo `phase`: la
+cadenza regola solo chi arriva dopo, così il livello non comincia con una strada vuota.
+
+Il percorso è misurato per **lunghezza d'arco**, quindi la velocità resta costante anche
+dove la curva è stretta. Le corsie laterali sono un po' più lunghe o più corte della linea
+centrale nelle curve, ma il conto usa sempre la centrale: sul lato esterno i nemici sono
+impercettibilmente più lenti del dovuto. Non si nota, e in cambio le corsie restano
+allineate fra loro.
 
 Il **budget conta i nemici che passano**, non quelli vivi: arrivare in fondo ne consuma
 uno, morire uccisi ne consuma un altro quando il posto viene ripreso. Se il budget è più
@@ -392,10 +421,15 @@ mossi da `EnemyPatrol`, che non partecipano a questo sistema.
 
 ### Il gizmo
 
-Sempre visibile, anche senza selezionare lo spawner. Per ogni corsia disegna la linea, le
-**frecce del senso di marcia**, la sfera piena dove i nemici compaiono e quella sbiadita
-dove spariscono, i cubi delle posizioni di partenza e un'etichetta con indice, verso,
-densità, velocità e budget. La strada si regola a occhio senza entrare in Play.
+Sempre visibile, anche senza selezionare lo spawner. Per ogni corsia disegna il percorso
+**seguendo le curve**, le frecce del senso di marcia, la sfera piena dove i nemici
+compaiono e quella sbiadita dove spariscono, i cubi delle posizioni di partenza e
+un'etichetta con indice, verso, densità, velocità e budget. Le sfere azzurre sono i punti
+di controllo (A, i waypoint, B): servono a ritrovarli quando la curva liscia se ne
+discosta. In Play una corsia incidentata diventa **rossa** e l'etichetta dice `INCIDENTE`.
+
+La strada si regola a occhio senza entrare in Play, e i waypoint si possono spostare
+**anche in Play**: il percorso viene ricostruito a ogni passo di fisica.
 
 ---
 
@@ -653,6 +687,10 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 | Un livello a quota di uccisioni | `GameManager.requiredKills` = N, `requireAllEnemiesDead` **off** |
 | Meno compenetrazioni nel traffico | `minGap` della corsia ↑ (sopra l'ingombro del prefab) |
 | Ingorghi più marcati | `slowdownGap` ↑ e `speedVariation` ↑ sulla stessa corsia |
+| Una strada curva | aggiungi `waypoints` fra A e B, `smoothPath` acceso |
+| Traffico irregolare | `spawnInterval` ↑ e `intervalVariation` ↑ |
+| L'incidente fa punti | `crashDamage` > 0 (ma facilita `requiredKills`) |
+| Una corsia bloccata per sempre dal primo colpo | `crashRecovery` = -1 |
 
 ---
 

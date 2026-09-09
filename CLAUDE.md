@@ -63,13 +63,18 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
 - `Enemy/EnemyPatrol.cs` — percorso su N waypoint. Rigidbody **kinematic** mosso con
   `MovePosition` (uno dinamico spostato a mano combatte col solver); torna dinamico
   alla morte, cosi' l'esplosione lo spedisce via.
-- `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B. Per corsia: densita',
-  verso di marcia, velocita' con variazione per singolo nemico, budget, sacchetto
-  pesato di tipi da cui pescare a ogni comparsa. Genera in `Awake()` per farsi
-  contare da `GameManager.Start()`. Il budget conta i nemici che **passano**, non
-  quelli vivi. Chi ha qualcuno davanti rallenta invece di attraversarlo
-  (`minGap`/`slowdownGap`): niente compenetrazioni e ingorghi che si sciolgono da
-  soli. Il traffico non rallenta per il teschio, di proposito.
+- `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B, curvabile con
+  `waypoints` intermedi (spline Catmull-Rom campionata in una spezzata, misurata
+  per lunghezza d'arco cosi' la velocita' resta costante nelle curve). Per corsia:
+  densita', verso di marcia, cadenza irregolare, velocita' con variazione per
+  singolo nemico, budget, sacchetto pesato di tipi da cui pescare a ogni comparsa.
+  Genera in `Awake()` per farsi contare da `GameManager.Start()`. Il budget conta
+  i nemici che **passano**, non quelli vivi. Chi ha qualcuno davanti rallenta
+  invece di attraversarlo (`minGap`/`slowdownGap`): niente compenetrazioni e
+  ingorghi che si sciolgono da soli. Il traffico non rallenta per il teschio, di
+  proposito. Uccidere un nemico provoca un **incidente**: gli altri della sua
+  corsia escono dai binari, vengono spinti via e il traffico si ferma per
+  `crashRecovery`.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
   `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
   obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
@@ -142,9 +147,24 @@ tipo `Destructible` che reagisce all'urto sopra una velocita' minima e chiama
 - **Casse e forzieri** — si rompono e danno qualcosa. I forzieri in particolare
   danno **Power** (`GameManager.AddPower`), che finora arriva solo dai nemici:
   saranno la seconda fonte di valuta.
-- **Torce e simili** — applicano uno **stato** al teschio (prende fuoco). Non
-  esiste ancora nessun concetto di stato sul teschio: e' la struttura da
-  progettare per prima quando si arrivera' qui.
+- **Torce e simili** — applicano uno **stato** al teschio (prende fuoco).
+
+## Stati / potenziamenti del teschio (LA PROSSIMA COSA DA FARE)
+
+Deciso dall'utente. Il teschio deve poter assumere degli stati che ne cambiano le
+proprieta' e il comportamento all'impatto. Esempi fatti: **ghiaccio**, **fuoco**,
+**rimbalzo** molto elevato, **acido**, **crea tornado** dove impatta.
+
+Due vie di attivazione, entrambe previste:
+
+1. raccogliendo oggetti nel livello (le torce di cui sopra)
+2. acquistandoli con **Power** da un menu dei potenziamenti, ancora da progettare
+
+L'utente sta ancora decidendo i dettagli, ma la **struttura degli stati va fatta
+per prima**: e' il presupposto sia delle torce sia del negozio, ed e' oggi il
+pezzo mancante piu' importante. Va progettata in modo che uno stato possa
+toccare fisica (rimbalzo, attrito), integrita', danno e reazione all'impatto,
+visto che gli esempi coprono tutte e quattro le cose.
 
 Due contatori distinti, da non confondere:
 
