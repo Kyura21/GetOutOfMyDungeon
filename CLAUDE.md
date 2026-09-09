@@ -67,7 +67,9 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   verso di marcia, velocita' con variazione per singolo nemico, budget, sacchetto
   pesato di tipi da cui pescare a ogni comparsa. Genera in `Awake()` per farsi
   contare da `GameManager.Start()`. Il budget conta i nemici che **passano**, non
-  quelli vivi.
+  quelli vivi. Chi ha qualcuno davanti rallenta invece di attraversarlo
+  (`minGap`/`slowdownGap`): niente compenetrazioni e ingorghi che si sciolgono da
+  soli. Il traffico non rallenta per il teschio, di proposito.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
   `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
   obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
@@ -95,8 +97,12 @@ serve la velocita' in ingresso, salvata a fine `FixedUpdate` (`lastVelocity` in
 
 Gioco **a livelli**. Due modi di vincere, alternativi:
 
-- **Obiettivi**: uccidere i nemici + risolvere i puzzle + raggiungere la soglia
-  di `requiredDamage`, tutti in AND (ognuno disattivabile).
+- **Obiettivi**: uccidere tutti i nemici (`requireAllEnemiesDead`) e/o ucciderne N
+  (`requiredKills`) + risolvere i puzzle + raggiungere la soglia di `requiredDamage`,
+  tutti in AND (ognuno disattivabile). `Kills` e' un conto **cumulativo** sul
+  `GameManager`, non `EnemiesAtStart - AliveCount`: con uno spawner attivo i nemici
+  continuano ad arrivare. Con lo spawner si usa `requiredKills` e si spegne
+  `requireAllEnemiesDead`, che non si soddisferebbe mai.
 - **Buca**: imbucare il teschio nella `WinHole`, che si apre colpendo gli
   `HoleOpener` sparsi nel livello. Vale **da sola**, anche a nemici vivi: e' la
   pacifist run. Cambia il punteggio finale, non l'esito.
@@ -123,6 +129,22 @@ Conseguenze pratiche:
   rallenta, `EnemyExplosive` innesca la catena.
 - Fermare il giocatore e basta e' la reazione peggiore: attenzione a
   `freezeSkullOnExplode`, che spento rende possibili le catene di schianti.
+
+### Oggetti di scena gia' progettati (da costruire, in quest'ordine di idee)
+
+Decisi dall'utente, non ancora implementati. Serviranno tutti un componente base
+tipo `Destructible` che reagisce all'urto sopra una velocita' minima e chiama
+`GameManager.AddDamage()`.
+
+- **Boulder** — molto resistente, **danneggia il teschio** invece di subire, e a
+  contatto lo fa esplodere. E' l'ostacolo che punisce lo schianto invece di
+  premiarlo, quindi va gestito con `SkullIntegrity.ApplyWear` / `Break`.
+- **Casse e forzieri** — si rompono e danno qualcosa. I forzieri in particolare
+  danno **Power** (`GameManager.AddPower`), che finora arriva solo dai nemici:
+  saranno la seconda fonte di valuta.
+- **Torce e simili** — applicano uno **stato** al teschio (prende fuoco). Non
+  esiste ancora nessun concetto di stato sul teschio: e' la struttura da
+  progettare per prima quando si arrivera' qui.
 
 Due contatori distinti, da non confondere:
 

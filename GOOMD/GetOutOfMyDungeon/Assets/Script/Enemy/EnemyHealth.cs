@@ -108,6 +108,7 @@ public class EnemyHealth : MonoBehaviour
     {
         if (GameManager.Instance != null)
         {
+            GameManager.Instance.AddKill();
             if (powerReward > 0) GameManager.Instance.AddPower(powerReward);
             if (damageScoreOnKill > 0) GameManager.Instance.AddDamage(damageScoreOnKill);
         }

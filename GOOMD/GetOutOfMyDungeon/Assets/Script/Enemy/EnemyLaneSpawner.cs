@@ -35,6 +35,10 @@ public class EnemyLaneSpawner : MonoBehaviour
         public float speed = 2f;
         [Range(0f, 1f)] public float speedVariation = 0f;  // 0.3 = ognuno fra il 70% e il 130%
 
+        [Header("Distanza di sicurezza")]
+        public float minGap = 1.2f;      // paraurti: piu' vicino di cosi' non si arriva mai
+        public float slowdownGap = 3.5f; // entro questa distanza si comincia a frenare
+
         [Header("Quanti in tutto")]
         public int spawnBudget = -1;                  // -1 = illimitato
 
@@ -175,7 +179,7 @@ public class EnemyLaneSpawner : MonoBehaviour
                     continue;
                 }
 
-                r.t += r.speed * Time.fixedDeltaTime / length;
+                Advance(r, list, lanes[i], length);
 
                 if (r.t >= 1f)
                 {
@@ -188,6 +192,60 @@ public class EnemyLaneSpawner : MonoBehaviour
                 Move(r, i);
             }
         }
+    }
+
+    // ---------- traffico ----------
+
+    // Chi ha qualcuno davanti rallenta invece di attraversarlo: entro
+    // slowdownGap frena in proporzione, a minGap e' fermo. Ne vengono fuori
+    // ingorghi che si formano e si sciolgono da soli, e nessuna compenetrazione.
+    void Advance(Runner r, List<Runner> list, Lane lane, float length)
+    {
+        float previous = r.t;
+
+        if (lane.minGap <= 0f)
+        {
+            r.t += r.speed * Time.fixedDeltaTime / length;
+            return;
+        }
+
+        float leaderT = LeaderT(list, r);
+        float factor = 1f;
+
+        if (!float.IsPositiveInfinity(leaderT))
+        {
+            float gap = (leaderT - r.t) * length;
+
+            // slowdownGap sotto minGap non avrebbe senso: eviterei una
+            // divisione per zero e una frenata a gradino
+            float slow = Mathf.Max(lane.slowdownGap, lane.minGap + 0.01f);
+            factor = Mathf.Clamp01((gap - lane.minGap) / (slow - lane.minGap));
+        }
+
+        r.t += r.speed * factor * Time.fixedDeltaTime / length;
+
+        if (float.IsPositiveInfinity(leaderT)) return;
+
+        // paraurti duro: la frenata proporzionale da sola non basta se chi sta
+        // davanti si e' fermato di colpo (ingorgo a monte, comparsa in coda)
+        float cap = leaderT - lane.minGap / length;
+        if (r.t > cap) r.t = Mathf.Max(previous, cap);   // mai indietro
+    }
+
+    // il primo che sta davanti sulla corsia: t cresce sempre nel verso di
+    // marcia, quindi "davanti" e' semplicemente il t piu' vicino fra i maggiori
+    static float LeaderT(List<Runner> list, Runner self)
+    {
+        float best = float.PositiveInfinity;
+
+        foreach (Runner other in list)
+        {
+            if (other == self || other.go == null) continue;
+            if (other.t <= self.t) continue;
+            if (other.t < best) best = other.t;
+        }
+
+        return best;
     }
 
     // ---------- comparsa e sparizione ----------

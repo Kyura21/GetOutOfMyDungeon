@@ -186,8 +186,15 @@ public class HUDController : MonoBehaviour
 
         if (enemiesText != null)
         {
-            int total = gameManager.EnemiesAtStart;
-            enemiesText.text = string.Format(enemiesFormat, total - EnemyHealth.AliveCount, total);
+            // il traguardo e' la quota richiesta se c'e', altrimenti quanti
+            // nemici c'erano all'inizio. Il numeratore e' sempre il conto
+            // cumulativo: con uno spawner attivo "vivi contro iniziali"
+            // andrebbe in negativo.
+            int goal = gameManager.requiredKills > 0
+                ? gameManager.requiredKills
+                : gameManager.EnemiesAtStart;
+
+            enemiesText.text = string.Format(enemiesFormat, gameManager.Kills, goal);
         }
 
         if (holeIndicator != null)

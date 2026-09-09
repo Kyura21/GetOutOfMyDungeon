@@ -342,6 +342,8 @@ scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 | `direction` | A→B | Il senso di marcia. Mettendo due corsie in versi opposti si ottengono le due carreggiate di una strada vera. |
 | `speed` | 2 | Velocità base della corsia, in metri al secondo. |
 | `speedVariation` | 0 | Variazione **per singolo nemico**: 0,3 significa che ognuno va fra il 70% e il 130% della velocità base, estratta alla comparsa. Rompe l'effetto processione e fa sì che il traffico si addensi e si diradi da solo. |
+| `minGap` | 1.2 | **Il paraurti**: distanza minima, in metri, da chi sta davanti. Non viene mai violata, quindi i nemici non si compenetrano più. `0` disattiva del tutto il controllo e li lascia passare uno dentro l'altro. Va tenuto sopra l'ingombro del prefab, o i modelli si toccheranno lo stesso. |
+| `slowdownGap` | 3.5 | Entro questa distanza si comincia a frenare, in proporzione: a `slowdownGap` si va a velocità piena, a `minGap` si è fermi. La differenza fra i due valori è la morbidezza della frenata — se sono vicini si inchiodano di colpo, se sono lontani rallentano da lontano e gli ingorghi diventano lunghi e lenti. |
 | `spawnBudget` | -1 | Budget della singola corsia. `-1` = illimitato. Si somma al vincolo di `totalSpawnBudget`: vale il più stretto dei due. |
 | `phase` | 0 | Sfasa la corsia rispetto alle altre (0-1), per non avere tutti allineati in griglia. |
 | `poolOverride` | vuoto | Sacchetto di tipi solo per questa corsia. Vuoto = usa `enemyPool`. Serve per corsie tematiche: una di soli esplosivi, una di soli corazzati. |
@@ -365,6 +367,22 @@ I nemici sono generati in `Awake()` e non in `Start()`, così si registrano in
 Un prefab **senza `EnemyHealth` è ammesso**: diventa un ostacolo che scorre sulla corsia e
 non muore mai.
 
+### Gli ingorghi
+
+Chi ha qualcuno davanti **rallenta invece di attraversarlo**, con una frenata proporzionale
+fra `slowdownGap` e `minGap`. Uniti a `speedVariation` — un lento davanti a un veloce — ne
+vengono fuori ingorghi che si formano e si sciolgono da soli, e una coda all'ingresso della
+corsia quando il traffico è più denso di quanto la strada regga.
+
+Oltre alla frenata c'è un **limite duro** che non lascia mai violare `minGap`: serve quando
+chi sta davanti si ferma di colpo, dove la sola frenata proporzionale arriverebbe tardi.
+Nessuno può però tornare indietro, quindi due nemici già compenetrati alla comparsa restano
+tali finché il primo non si allontana.
+
+Il traffico **non rallenta per il teschio**: i nemici gli vanno addosso, ed è voluto.
+Neanche per i nemici delle altre corsie — le corsie sono indipendenti — né per quelli
+mossi da `EnemyPatrol`, che non partecipano a questo sistema.
+
 > **Attenzione a `requireAllEnemiesDead`**: se almeno una corsia ha budget illimitato
 > *e* `totalSpawnBudget` è `-1`, i nemici arrivano per sempre e il livello **non si può
 > vincere per obiettivi**. Dai un budget allo spawner, oppure spegni `requireAllEnemiesDead`
@@ -387,7 +405,7 @@ densità, velocità e budget. La strada si regola a occhio senza entrare in Play
 
 **Due strade di vittoria indipendenti, in OR:**
 
-1. **Obiettivi** — nemici + puzzle + soglia danni, tutti in **AND** fra loro (ognuno disattivabile)
+1. **Obiettivi** — nemici (tutti e/o N) + puzzle + soglia danni, tutti in **AND** fra loro (ognuno disattivabile)
 2. **Buca** — imbucare nella `WinHole` vince da solo, anche a nemici vivi: è la *pacifist run*
 
 `LastWinReason` registra quale delle due, servirà al punteggio finale.
@@ -397,6 +415,7 @@ densità, velocità e budget. La strada si regola a occhio senza entrare in Play
 | `skull` | vuoto | collegato | Il `SkullIntegrity` del giocatore. Se lo lasci vuoto lo cerca in scena da solo. |
 | `winHole` | vuoto | **vuoto** | La `WinHole` del livello. Vuoto va benissimo: `Awake()` la trova con `FindFirstObjectByType`. Assegnala solo se un giorno ci fossero più buche e volessi scegliere quale conta. |
 | `requireAllEnemiesDead` | true | true | Obiettivo "uccidi tutti". **Se in scena non c'è nessun nemico questo obiettivo viene ignorato**, non considerato già soddisfatto: senza questa precauzione un livello senza nemici si vincerebbe da solo al primo frame. |
+| `requiredKills` | 0 | 0 | Obiettivo "uccidine N", indipendente dal precedente. `0` = non è un obiettivo. È il conto **cumulativo** (`GameManager.Kills`), non "quanti ne restano": è l'unico che regge con un `EnemyLaneSpawner` attivo, dove i nemici continuano ad arrivare. Con lo spawner usa questo e **spegni** `requireAllEnemiesDead`, che con del traffico in arrivo non si soddisferebbe mai. |
 | `requiredDamage` | 0 | **10** | Soglia di punteggio Danni da raggiungere. `0` = non è un obiettivo. |
 | `requiredPuzzles` | vuoto | vuoto | Lista di `PuzzleTrigger` che devono essere risolti. Vuoto = nessun puzzle richiesto. |
 | `countDamageAfterWin` | false | false | Se continuare a contare i danni dopo la fine del livello. Utile per lasciar godere l'esplosione finale senza congelare il contatore. |
@@ -539,7 +558,7 @@ lo script non serve più. Richiede le **TMP Essential Resources** importate
 | `damageFormat` | `{0:n0}` | Formato del punteggio danni (separatore delle migliaia). |
 | `damageRollSpeed` | 6 | Velocità con cui il contatore rincorre il valore vero, stile Burnout. `0` = salto secco. Sul pannello finale viene comunque allineato al totale reale. |
 | `powerCurrencyFormat` | `POWER {0}` | Formato del contatore di valuta. |
-| `enemiesFormat` | `NEMICI {0} / {1}` | `{0}` = uccisi, `{1}` = totale a inizio livello (`GameManager.EnemiesAtStart`). |
+| `enemiesFormat` | `NEMICI {0} / {1}` | `{0}` = uccisi (`GameManager.Kills`, cumulativo). `{1}` = `requiredKills` se il livello lo chiede, altrimenti i nemici presenti all'inizio. |
 | `holeIndicator` | — | GameObject acceso quando la buca si apre. Serve a far capire che gli `HoleOpener` hanno funzionato. |
 | `winPanel` / `losePanel` | — | Pannelli di fine livello, spenti in `Start()`. |
 | `statsFormat` | `Danni {0:n0}   Power {1}` | Riepilogo mostrato su entrambi i pannelli. |
@@ -631,6 +650,9 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 | Pacifist run più difficile | più `HoleOpener` con `requireAllOpeners = true`, e `minImpactSpeed` ↑ |
 | Meno tempo morto fra un tiro e l'altro | `SkullRolling.stopThreshold` ↑ (attenzione: tronca i rotolamenti lenti) |
 | Il punteggio danni conta davvero | `GameManager.requiredDamage` in migliaia (un nemico = 550) |
+| Un livello a quota di uccisioni | `GameManager.requiredKills` = N, `requireAllEnemiesDead` **off** |
+| Meno compenetrazioni nel traffico | `minGap` della corsia ↑ (sopra l'ingombro del prefab) |
+| Ingorghi più marcati | `slowdownGap` ↑ e `speedVariation` ↑ sulla stessa corsia |
 
 ---
 
@@ -660,8 +682,12 @@ produce bug silenziosi, non errori di compilazione.
    catena parte. Un raggio più piccolo della spaziatura non innesca mai niente.
 8. **I budget di `EnemyLaneSpawner` vs `GameManager.requireAllEnemiesDead`** — traffico
    infinito (nessun budget, né globale né di corsia) e obiettivo "uccidi tutti" insieme
-   rendono il livello invincibile.
-9. **Il tag `enemy`** — è l'unica cosa che innesca l'esplosione (`SkullExplosion`
+   rendono il livello invincibile. Con uno spawner attivo l'obiettivo giusto è
+   `requiredKills`.
+9. **`Lane.minGap` vs l'ingombro del prefab** — la distanza minima è misurata fra i
+   centri, non fra le superfici: se il nemico è largo più di `minGap`, i modelli si
+   toccheranno lo stesso anche col controllo attivo.
+10. **Il tag `enemy`** — è l'unica cosa che innesca l'esplosione (`SkullExplosion`
    controlla `CompareTag("enemy")`). Un nemico senza tag viene comunque **danneggiato**
    dall'onda d'urto se sta nel raggio, ma non la fa **partire**. Tutto il resto del
    progetto riconosce gli oggetti dal componente, non dal tag: questa è l'unica eccezione.

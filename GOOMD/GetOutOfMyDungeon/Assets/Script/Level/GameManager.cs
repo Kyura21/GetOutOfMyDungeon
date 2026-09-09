@@ -16,6 +16,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Obiettivi del livello (in AND fra loro)")]
     public bool requireAllEnemiesDead = true;
+    public int requiredKills = 0;              // 0 = il numero di uccisioni non e' un obiettivo
     public int requiredDamage = 0;             // 0 = il punteggio danni non e' un obiettivo
     public PuzzleTrigger[] requiredPuzzles;
 
@@ -38,6 +39,11 @@ public class GameManager : MonoBehaviour
 
     // punteggio distruzione, stile modalita' Crash di Burnout
     public int Damage { get; private set; }
+
+    // nemici uccisi da inizio livello. Non e' EnemiesAtStart - AliveCount:
+    // con uno spawner attivo i nemici continuano ad arrivare, quindi l'unico
+    // conto che regge e' quello cumulativo
+    public int Kills { get; private set; }
 
     public WinReason LastWinReason { get; private set; } = WinReason.None;
     public string LastLoseReason { get; private set; }
@@ -66,6 +72,7 @@ public class GameManager : MonoBehaviour
         EnemiesAtStart = enemies;
 
         hasObjectives = (requireAllEnemiesDead && enemies > 0)
+                        || requiredKills > 0
                         || requiredDamage > 0
                         || (requiredPuzzles != null && requiredPuzzles.Length > 0);
 
@@ -108,6 +115,7 @@ public class GameManager : MonoBehaviour
     public bool AreLevelObjectivesMet()
     {
         if (requireAllEnemiesDead && EnemyHealth.AliveCount > 0) return false;
+        if (Kills < requiredKills) return false;
         if (Damage < requiredDamage) return false;
 
         if (requiredPuzzles != null)
@@ -123,6 +131,13 @@ public class GameManager : MonoBehaviour
     {
         if (amount <= 0) return;
         Power += amount;
+    }
+
+    // la chiama EnemyHealth quando muore: il conto vive qui e non sui nemici
+    // perche' i nemici morti spariscono, portandosi via il loro conto
+    public void AddKill()
+    {
+        Kills++;
     }
 
     public void AddDamage(int amount)
