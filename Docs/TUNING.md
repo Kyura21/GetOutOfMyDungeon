@@ -322,34 +322,62 @@ Non ti ferma con gli HP ma con la fisica: si mangia gran parte della velocità d
 Una strada dal punto A al punto B divisa in N corsie parallele. I nemici compaiono in A,
 scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 
+### Impostazioni della strada
+
 | Campo | Default | Cosa fa |
 |---|---|---|
-| `pointA` / `pointB` | vuoti | Inizio e fine della strada. Le corsie sono parallele alla linea A-B. |
+| `pointA` / `pointB` | vuoti | Gli estremi della strada. Le corsie sono parallele alla linea A-B. |
 | `laneSpacing` | 2 | Distanza fra una corsia e l'altra, perpendicolare alla strada. |
 | `centerLanes` | true | Le corsie stanno a cavallo della linea A-B invece di partire da essa. |
-| `lanes` | 1 corsia | Una voce per corsia. |
-| `enemyPrefab` | vuoto | Prefab usato dalle corsie che non ne specificano uno proprio. |
+| `enemyPool` | vuoto | **Il sacchetto da cui si pesca il tipo di nemico**: una voce per tipo, ognuna con un `prefab` e un `weight`. Peso 3 contro peso 1 significa che esce il triplo delle volte. Con una sola voce lo spawner genera sempre lo stesso nemico. |
 | `faceTravelDirection` | true | I nemici guardano nel verso di marcia. |
-| `respawnDelay` | 3 | Secondi prima che un nemico ucciso ricompaia in A. **`-1` = non ricompare.** |
+| `respawnDelay` | 3 | Secondi prima che il posto di un nemico **ucciso** venga ripreso. **`-1` = quel posto resta vuoto.** Non riguarda chi arriva in fondo: quello è rimpiazzato subito. |
+| `totalSpawnBudget` | -1 | **Quanti nemici passeranno in tutto**, su tutte le corsie insieme. `-1` = infiniti. Finito il budget la strada si svuota e non ne arrivano più. |
 
-Per ogni corsia: `enemyCount` (quanti nemici la percorrono), `speed`, `reversed` (scorre da
-B verso A — corsie opposte come una strada vera), `phase` (sfasa la corsia rispetto alle
-altre, 0-1, per non avere tutti allineati) e `prefabOverride`.
+### Impostazioni per corsia
 
-I nemici sono **riciclati** a fine corsa, non distrutti e ricreati: il numero per corsia
-resta esattamente quello impostato. Vengono generati in `Awake()` e non in `Start()`, così
-si registrano in `EnemyHealth.All` prima che `GameManager.Start()` conti i nemici del
-livello — altrimenti `EnemiesAtStart` sarebbe zero e l'HUD scriverebbe `0 / 0`.
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `enemyCount` | 3 | Quanti nemici percorrono la corsia **insieme**. È la densità del traffico. |
+| `direction` | A→B | Il senso di marcia. Mettendo due corsie in versi opposti si ottengono le due carreggiate di una strada vera. |
+| `speed` | 2 | Velocità base della corsia, in metri al secondo. |
+| `speedVariation` | 0 | Variazione **per singolo nemico**: 0,3 significa che ognuno va fra il 70% e il 130% della velocità base, estratta alla comparsa. Rompe l'effetto processione e fa sì che il traffico si addensi e si diradi da solo. |
+| `spawnBudget` | -1 | Budget della singola corsia. `-1` = illimitato. Si somma al vincolo di `totalSpawnBudget`: vale il più stretto dei due. |
+| `phase` | 0 | Sfasa la corsia rispetto alle altre (0-1), per non avere tutti allineati in griglia. |
+| `poolOverride` | vuoto | Sacchetto di tipi solo per questa corsia. Vuoto = usa `enemyPool`. Serve per corsie tematiche: una di soli esplosivi, una di soli corazzati. |
 
-> **Attenzione a `requireAllEnemiesDead`**: con lo spawner attivo e `respawnDelay ≥ 0` i
-> nemici tornano per sempre e il livello **non si può vincere per obiettivi**. O metti
-> `respawnDelay` a `-1`, o spegni `requireAllEnemiesDead` e lasci la buca come via di
-> vittoria — che è poi il senso della strada trafficata: un ostacolo da attraversare, non
-> nemici da sterminare. Lo script te lo segnala con un warning all'avvio.
+### Come funziona
 
-Il gizmo disegna le corsie, il punto di comparsa (sfera piena) e di sparizione (sfera
-sbiadita), più i cubi delle posizioni di partenza: la spaziatura si regola a occhio senza
-entrare in Play.
+Ogni nemico compare in **testa** alla corsia (che è `pointA` o `pointB` a seconda di
+`direction`), la percorre e sparisce in fondo, dove ne compare subito un altro: la corsia
+resta piena finché c'è budget. Il tipo viene **ripescato a ogni comparsa**, quindi la
+composizione del traffico cambia da sola nel tempo.
+
+Il **budget conta i nemici che passano**, non quelli vivi: arrivare in fondo ne consuma
+uno, morire uccisi ne consuma un altro quando il posto viene ripreso. Se il budget è più
+stretto del traffico impostato (`spawnBudget 2` con `enemyCount 5`), la corsia parte già
+incompleta invece di sforare.
+
+I nemici sono generati in `Awake()` e non in `Start()`, così si registrano in
+`EnemyHealth.All` prima che `GameManager.Start()` conti i nemici del livello — altrimenti
+`EnemiesAtStart` sarebbe zero e l'HUD scriverebbe `0 / 0`.
+
+Un prefab **senza `EnemyHealth` è ammesso**: diventa un ostacolo che scorre sulla corsia e
+non muore mai.
+
+> **Attenzione a `requireAllEnemiesDead`**: se almeno una corsia ha budget illimitato
+> *e* `totalSpawnBudget` è `-1`, i nemici arrivano per sempre e il livello **non si può
+> vincere per obiettivi**. Dai un budget allo spawner, oppure spegni `requireAllEnemiesDead`
+> e lascia la buca come via di vittoria — che è poi il senso di una strada trafficata: un
+> ostacolo da attraversare, non nemici da sterminare. Lo script avvisa all'avvio, ma **solo
+> quando il traffico è davvero infinito**: con un budget finito non dice niente.
+
+### Il gizmo
+
+Sempre visibile, anche senza selezionare lo spawner. Per ogni corsia disegna la linea, le
+**frecce del senso di marcia**, la sfera piena dove i nemici compaiono e quella sbiadita
+dove spariscono, i cubi delle posizioni di partenza e un'etichetta con indice, verso,
+densità, velocità e budget. La strada si regola a occhio senza entrare in Play.
 
 ---
 
@@ -630,8 +658,9 @@ produce bug silenziosi, non errori di compilazione.
    con quella di partenza.
 7. **`EnemyExplosive.radius` vs la distanza fra i nemici** — è quello che decide se la
    catena parte. Un raggio più piccolo della spaziatura non innesca mai niente.
-8. **`EnemyLaneSpawner.respawnDelay` vs `GameManager.requireAllEnemiesDead`** — nemici
-   che ricompaiono e obiettivo "uccidi tutti" insieme rendono il livello invincibile.
+8. **I budget di `EnemyLaneSpawner` vs `GameManager.requireAllEnemiesDead`** — traffico
+   infinito (nessun budget, né globale né di corsia) e obiettivo "uccidi tutti" insieme
+   rendono il livello invincibile.
 9. **Il tag `enemy`** — è l'unica cosa che innesca l'esplosione (`SkullExplosion`
    controlla `CompareTag("enemy")`). Un nemico senza tag viene comunque **danneggiato**
    dall'onda d'urto se sta nel raggio, ma non la fa **partire**. Tutto il resto del

@@ -63,8 +63,11 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
 - `Enemy/EnemyPatrol.cs` — percorso su N waypoint. Rigidbody **kinematic** mosso con
   `MovePosition` (uno dinamico spostato a mano combatte col solver); torna dinamico
   alla morte, cosi' l'esplosione lo spedisce via.
-- `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B, nemici riciclati a fine
-  corsa. Genera in `Awake()` per farsi contare da `GameManager.Start()`.
+- `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B. Per corsia: densita',
+  verso di marcia, velocita' con variazione per singolo nemico, budget, sacchetto
+  pesato di tipi da cui pescare a ogni comparsa. Genera in `Awake()` per farsi
+  contare da `GameManager.Start()`. Il budget conta i nemici che **passano**, non
+  quelli vivi.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
   `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
   obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
@@ -100,6 +103,26 @@ Gioco **a livelli**. Due modi di vincere, alternativi:
 
 **Perdi**: integrita' del teschio a zero (si logora rotolando, **non** subisce
 danno dalle esplosioni) oppure caduta fuori mappa (`KillZone` / `fallY`).
+
+## Il modello di riferimento: Burnout 3, modalita' Crash
+
+Deciso dall'utente, vale per **tutto** il design delle collisioni: lo schianto e'
+l'obiettivo, non un fallimento. Ogni cosa contro cui il teschio si schianta deve
+reagire in modo suo — fare punti danno, respingerlo, rallentarlo, esplodere,
+innescare qualcos'altro — e la varieta' di quelle reazioni e' il gioco.
+
+Conseguenze pratiche:
+
+- Il punteggio **Damage** e' il punteggio principale della modalita'. Per ora lo
+  alimentano solo i nemici (`EnemyHealth` ed `EnemyExplosive`): quando ci saranno
+  oggetti di scena distruttibili dovranno chiamare `GameManager.AddDamage()`.
+  **Un componente per i props distruttibili non esiste ancora ed e' il pezzo
+  mancante piu' evidente.**
+- Una reazione all'urto che non da' ne' punti ne' un vantaggio tattico e' fuori
+  bersaglio: `EnemyArmor` respinge (e con `bounceKeep` > 1 rilancia), `EnemyAbsorber`
+  rallenta, `EnemyExplosive` innesca la catena.
+- Fermare il giocatore e basta e' la reazione peggiore: attenzione a
+  `freezeSkullOnExplode`, che spento rende possibili le catene di schianti.
 
 Due contatori distinti, da non confondere:
 
