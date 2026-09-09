@@ -16,6 +16,11 @@ public class SkullRolling : MonoBehaviour
 
     public bool IsStopped => rb.linearVelocity.sqrMagnitude < stopThreshold * stopThreshold;
 
+    // velocita' in ingresso all'ultimo passo di fisica: dentro un callback di
+    // collisione la velocita' del Rigidbody e' gia' quella di rimbalzo, quindi
+    // chi deve pesare un urto legge questa (vedi EnemyArmor)
+    public Vector3 LastVelocity => lastVelocity;
+
     private Rigidbody rb;
     private Vector3 lastVelocity;
 

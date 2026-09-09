@@ -233,6 +233,126 @@ per l'obiettivo "uccidi tutti".
 
 ---
 
+## 7-bis. Gli archetipi di nemico
+
+Componenti opzionali da aggiungere accanto a `EnemyHealth`. Sono combinabili:
+un corazzato esplosivo che pattuglia è legittimo.
+
+### `EnemyArmor` — corazzato direzionale e a soglia
+
+`Assets/Script/Enemy/EnemyArmor.cs`
+
+Due regole indipendenti, entrambe disattivabili. Un colpo bloccato **non fa esplodere il
+teschio**: rimbalza come su una sponda e resta in gioco.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `directional` | true | Attiva la corazza direzionale. |
+| `armorFacing` | vuoto | Il transform il cui `forward` è il lato corazzato. Vuoto = il transform del nemico. Utile per corazzare un lato diverso da quello in cui guarda la mesh. |
+| `armorHalfAngle` | 70 | Semiapertura del cono corazzato. 70° = tutto il fronte più i fianchi; 90° = mezzo nemico; 180° = invulnerabile. Il gizmo lo disegna quando lo selezioni. |
+| `minBreakSpeed` | 0 | Sotto questa velocità d'impatto il colpo non passa **da nessun lato**. È l'archetipo "corazzato a soglia": costringe a spendere potenza, quindi integrità. `0` disattiva la regola. |
+| `bounceKeep` | 0.9 | Quanta velocità conserva il teschio respinto. `1` = sponda perfetta, **>1 lo accelera** (bumper: si può usare per raggiungere zone lontane senza consumare integrità). |
+| `minBounceSpeed` | 2 | Sotto questa velocità non riscrivo la velocità del teschio: rilanciarlo a bassa velocità lo farebbe scattare in modo innaturale. |
+| `blocksSplash` | false | Se la corazza para anche l'onda d'urto che arriva dal suo lato. Spento, un esplosivo vicino uccide il corazzato aggirando la corazza — che è spesso la soluzione voluta del puzzle. |
+
+> Il controllo è fatto da `SkullExplosion` **prima** di esplodere, non da un
+> `OnCollisionEnter` di `EnemyArmor`. Se fosse qui, l'ordine dei due callback sarebbe
+> casuale e ogni tanto il teschio esploderebbe lo stesso.
+
+### `EnemyExplosive` — esplosivo a catena
+
+`Assets/Script/Enemy/EnemyExplosive.cs`. Richiede `EnemyHealth`.
+
+Morendo esplode a sua volta e innesca i vicini. Si aggancia da solo a `EnemyHealth.onDied`:
+**non c'è niente da collegare nell'Inspector**.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `radius` | 3 | Raggio dell'esplosione. Confrontalo con la distanza a cui piazzi i nemici: è quello che decide se la catena parte. |
+| `damage` | 2 | Danno ai nemici nel raggio. |
+| `force` | 20 | Spinta sui Rigidbody, come impulso. |
+| `upwardsModifier` | 0.4 | Quanto la spinta va verso l'alto. |
+| `damageScore` | 300 | Punteggio Danni per l'esplosione in sé. Il punteggio dei nemici colpiti lo aggiunge già `EnemyHealth.TakeDamage`, quindi **non contarlo due volte** qui. |
+| `explosionVFX` / `destroyDelay` | vuoto / 2 | Come su `SkullExplosion`. |
+
+La catena si risolve tutta **nello stesso frame**: ogni nemico esplode una volta sola
+(`HasExploded`), quindi non può rimbalzare all'infinito. L'esplosione spinge anche il
+teschio, se è nel raggio.
+
+### `EnemyAbsorber` — gelatinoso
+
+`Assets/Script/Enemy/EnemyAbsorber.cs`
+
+Non ti ferma con gli HP ma con la fisica: si mangia gran parte della velocità del teschio.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `speedKeep` | 0.25 | Frazione di velocità che **sopravvive** all'urto. 0,25 = ne resta un quarto. |
+| `minImpactSpeed` | 1 | Sotto, non tocco niente: eviterei di incollare la palla al primo sfioramento. |
+| `absorbAngular` | true | Frena anche la rotazione, altrimenti il teschio continua a filare visivamente. |
+
+> Ha senso solo con **`SkullExplosion.freezeSkullOnExplode` spento**: se il teschio si
+> ferma comunque a ogni esplosione, l'assorbimento non si vede.
+
+### `EnemyPatrol` — pattugliamento su N punti
+
+`Assets/Script/Enemy/EnemyPatrol.cs`. Richiede `Rigidbody`.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `waypoints` | vuoto | I punti del percorso, in ordine. Oggetti vuoti va benissimo. **Non devono essere figli del nemico**: si muoverebbero con lui e il percorso scapperebbe in avanti — lo script te lo segnala con un warning. |
+| `mode` | PingPong | `Loop` (torna al primo), `PingPong` (avanti e indietro), `Once` (si ferma in fondo). |
+| `snapToFirstWaypoint` | true | Si posiziona esattamente sul primo punto in `Start()`. |
+| `speed` | 2 | Metri al secondo. |
+| `waitAtWaypoint` | 0.5 | Pausa a ogni punto. È la leva del **timing del tiro**: pause lunghe danno finestre generose. |
+| `arriveThreshold` | 0.05 | Quanto vicino basta arrivare per considerare raggiunto il punto. |
+| `faceMovement` / `turnSpeed` | true / 720 | Si gira nella direzione di marcia. `turnSpeed` 0 = gira di scatto. |
+| `stunOnHit` | 0 | Secondi di stop dopo aver incassato un colpo senza morire. Feedback utile sui corazzati. |
+
+> **Come si muove**: il Rigidbody viene reso **kinematic** e mosso con `MovePosition`.
+> Un corpo dinamico spostato a mano combatte col solver e vibra contro i muri, mentre uno
+> kinematic fa comunque da ostacolo solido al teschio. **Alla morte torna dinamico**, così
+> l'onda d'urto che lo ha ucciso lo spedisce via: per questo `SkullExplosion` applica il
+> danno *prima* della spinta, nella stessa iterazione.
+
+### `EnemyLaneSpawner` — la strada a corsie
+
+`Assets/Script/Enemy/EnemyLaneSpawner.cs`
+
+Una strada dal punto A al punto B divisa in N corsie parallele. I nemici compaiono in A,
+scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `pointA` / `pointB` | vuoti | Inizio e fine della strada. Le corsie sono parallele alla linea A-B. |
+| `laneSpacing` | 2 | Distanza fra una corsia e l'altra, perpendicolare alla strada. |
+| `centerLanes` | true | Le corsie stanno a cavallo della linea A-B invece di partire da essa. |
+| `lanes` | 1 corsia | Una voce per corsia. |
+| `enemyPrefab` | vuoto | Prefab usato dalle corsie che non ne specificano uno proprio. |
+| `faceTravelDirection` | true | I nemici guardano nel verso di marcia. |
+| `respawnDelay` | 3 | Secondi prima che un nemico ucciso ricompaia in A. **`-1` = non ricompare.** |
+
+Per ogni corsia: `enemyCount` (quanti nemici la percorrono), `speed`, `reversed` (scorre da
+B verso A — corsie opposte come una strada vera), `phase` (sfasa la corsia rispetto alle
+altre, 0-1, per non avere tutti allineati) e `prefabOverride`.
+
+I nemici sono **riciclati** a fine corsa, non distrutti e ricreati: il numero per corsia
+resta esattamente quello impostato. Vengono generati in `Awake()` e non in `Start()`, così
+si registrano in `EnemyHealth.All` prima che `GameManager.Start()` conti i nemici del
+livello — altrimenti `EnemiesAtStart` sarebbe zero e l'HUD scriverebbe `0 / 0`.
+
+> **Attenzione a `requireAllEnemiesDead`**: con lo spawner attivo e `respawnDelay ≥ 0` i
+> nemici tornano per sempre e il livello **non si può vincere per obiettivi**. O metti
+> `respawnDelay` a `-1`, o spegni `requireAllEnemiesDead` e lasci la buca come via di
+> vittoria — che è poi il senso della strada trafficata: un ostacolo da attraversare, non
+> nemici da sterminare. Lo script te lo segnala con un warning all'avvio.
+
+Il gizmo disegna le corsie, il punto di comparsa (sfera piena) e di sparizione (sfera
+sbiadita), più i cubi delle posizioni di partenza: la spaziatura si regola a occhio senza
+entrare in Play.
+
+---
+
 ## 8. Vittoria e sconfitta — `GameManager`
 
 `Assets/Script/Level/GameManager.cs` — su `Game_Manager`. Singleton (`GameManager.Instance`).
@@ -504,7 +624,15 @@ produce bug silenziosi, non errori di compilazione.
    controllo di caduta è già disattivato quando `IsPotted`.
 5. **`SkullIntegrity.wearPerMeter` vs `maxPower` e `rollingDamping`** — insieme decidono
    quanti tiri dura un livello. Vedi i conti al capitolo 5.
-6. **Il tag `enemy`** — è l'unica cosa che innesca l'esplosione (`SkullExplosion`
+6. **`EnemyArmor.minBreakSpeed` vs `SkullAimController.maxPower`** — una soglia più alta
+   della velocità massima ottenibile rende il nemico invincibile. Ricorda che la palla
+   rallenta strada facendo: la soglia va confrontata con la velocità *all'arrivo*, non
+   con quella di partenza.
+7. **`EnemyExplosive.radius` vs la distanza fra i nemici** — è quello che decide se la
+   catena parte. Un raggio più piccolo della spaziatura non innesca mai niente.
+8. **`EnemyLaneSpawner.respawnDelay` vs `GameManager.requireAllEnemiesDead`** — nemici
+   che ricompaiono e obiettivo "uccidi tutti" insieme rendono il livello invincibile.
+9. **Il tag `enemy`** — è l'unica cosa che innesca l'esplosione (`SkullExplosion`
    controlla `CompareTag("enemy")`). Un nemico senza tag viene comunque **danneggiato**
    dall'onda d'urto se sta nel raggio, ma non la fa **partire**. Tutto il resto del
    progetto riconosce gli oggetti dal componente, non dal tag: questa è l'unica eccezione.
@@ -520,7 +648,10 @@ Aperte, da tenere presenti quando si progetta il bilanciamento:
   dei singoli nemici (per ora il feedback è solo il flash rosso).
 - **Sistema di potenziamenti** non progettato: il Power si accumula ma non si spende.
 - **Puzzle veri** non progettati: `PuzzleTrigger` è solo l'aggancio.
-- **Nemici senza AI**: bersagli fermi.
+- **Nemici senza AI reattiva**: pattugliano un percorso fisso, ma non inseguono né
+  reagiscono alla posizione del teschio.
+- **Nessun prefab di nemico**: gli archetipi sono componenti da comporre a mano.
+  `EnemyLaneSpawner` ne vuole uno per forza.
 - **Oggetti distruttibili** inesistenti: per ora il punteggio Danni lo alimentano solo i
   nemici. Quando ci saranno, dovranno chiamare `GameManager.AddDamage()`.
 - **Nessun restart di livello**: gli script hanno già i metodi (`ResetIntegrity`,

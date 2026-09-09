@@ -52,6 +52,19 @@ una stecca a forma di braccio scheletrico; il teschio esplode al contatto con i 
   con moltiplicatore crescente man mano che si rovina.
 - `Enemy/EnemyHealth.cs` — HP impostabili, registro statico `All` / `AliveCount`
   (aggiornato in `OnEnable`/`OnDisable`), flash rosso sul colpo, `powerReward`.
+- `Enemy/EnemyArmor.cs` — corazza direzionale (cono attorno a `forward`) e/o soglia
+  di velocita'. Il colpo bloccato **non fa esplodere** il teschio: rimbalza.
+  Il controllo lo fa `SkullExplosion` prima di esplodere, non un `OnCollisionEnter`
+  qui: l'ordine dei due callback sarebbe casuale.
+- `Enemy/EnemyExplosive.cs` — esplode morendo e innesca i vicini. Si aggancia da
+  solo a `onDied`. La catena si risolve nello stesso frame, `HasExploded` la chiude.
+- `Enemy/EnemyAbsorber.cs` — mangia la velocita' del teschio nell'urto. Serve solo
+  se `freezeSkullOnExplode` e' spento.
+- `Enemy/EnemyPatrol.cs` — percorso su N waypoint. Rigidbody **kinematic** mosso con
+  `MovePosition` (uno dinamico spostato a mano combatte col solver); torna dinamico
+  alla morte, cosi' l'esplosione lo spedisce via.
+- `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B, nemici riciclati a fine
+  corsa. Genera in `Awake()` per farsi contare da `GameManager.Start()`.
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
   `fallY` come rete di sicurezza. **Due vie di vittoria indipendenti** (OR): gli
   obiettivi in `AreLevelObjectivesMet()` (nemici + puzzle + soglia danni, in AND)
@@ -113,7 +126,8 @@ disponibile): chiedi conferma che compili prima di dare per buono il codice nuov
 - Taratura di `wearPerMeter` (1 su 100 di integrita' = 100 m di rotolamento a livello:
   molto stretto, da provare)
 - `explosionVFX` e `deathVFX` non assegnati
-- Nessuna UI per HP / integrita' / Power
 - Sistema di potenziamenti da progettare
 - Puzzle veri da progettare (`PuzzleTrigger` e' solo l'aggancio)
-- Nemici senza AI: per ora bersagli fermi
+- Nessun prefab di nemico: gli archetipi sono componenti da comporre a mano,
+  e `EnemyLaneSpawner` un prefab lo vuole per forza
+- I nemici non reagiscono alla posizione del teschio: pattugliano e basta

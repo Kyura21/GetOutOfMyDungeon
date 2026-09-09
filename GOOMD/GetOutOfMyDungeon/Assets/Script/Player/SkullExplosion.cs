@@ -34,12 +34,33 @@ public class SkullExplosion : MonoBehaviour
     // quando ha piu' di un collider dentro il raggio
     private readonly HashSet<EnemyHealth> damaged = new HashSet<EnemyHealth>();
 
+    private Rigidbody myRb;
+    private SkullRolling rolling;
+
+    void Awake()
+    {
+        myRb = GetComponent<Rigidbody>();
+        rolling = GetComponent<SkullRolling>();
+    }
+
     void OnCollisionEnter(Collision collision)
     {
         if (hasExploded) return;
+        if (!collision.gameObject.CompareTag("enemy")) return;
 
-        if (collision.gameObject.CompareTag("enemy"))
-            Explode(collision.contacts[0].point);
+        ContactPoint contact = collision.GetContact(0);
+
+        // la corazza puo' respingere il colpo: in quel caso non esplodo affatto,
+        // il teschio rimbalza come su una sponda e resta in gioco
+        EnemyArmor armor = collision.collider.GetComponentInParent<EnemyArmor>();
+        if (armor != null && armor.BlocksContact(contact.normal, collision.relativeVelocity.magnitude))
+        {
+            Vector3 incoming = rolling != null ? rolling.LastVelocity : -collision.relativeVelocity;
+            armor.Block(myRb, incoming, contact.normal);
+            return;
+        }
+
+        Explode(contact.point);
     }
 
     public void Explode(Vector3 point)
@@ -59,19 +80,27 @@ public class SkullExplosion : MonoBehaviour
         {
             EnemyHealth enemy = c.GetComponentInParent<EnemyHealth>();
             if (enemy != null && !enemy.IsDead && damaged.Add(enemy))
-                enemy.TakeDamage(GetDamageAt(c, point));
+            {
+                EnemyArmor armor = enemy.GetComponent<EnemyArmor>();
+                if (armor == null || !armor.BlocksSplashFrom(point))
+                    enemy.TakeDamage(GetDamageAt(c, point));
+            }
 
             Rigidbody rb = c.attachedRigidbody;
             if (rb == null) continue;
             if (rb.gameObject == gameObject) continue; // non spinge se stesso
+
+            // i nemici in pattuglia sono kinematic finche' sono vivi: spingerli
+            // non farebbe niente e Unity avvisa. Chi muore torna dinamico prima
+            // di arrivare qui, perche' il danno lo applico due righe sopra.
+            if (rb.isKinematic) continue;
 
             rb.AddExplosionForce(explosionForce, point, explosionRadius, upwardsModifier, ForceMode.Impulse);
         }
 
         if (freezeSkullOnExplode)
         {
-            Rigidbody myRb = GetComponent<Rigidbody>();
-            if (myRb != null)
+            if (myRb != null && !myRb.isKinematic)
             {
                 myRb.linearVelocity = Vector3.zero;
                 myRb.angularVelocity = Vector3.zero;
