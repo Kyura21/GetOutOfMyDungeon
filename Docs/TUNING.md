@@ -139,7 +139,7 @@ capire a occhio `aimDistance` e `aimHeight` senza entrare in Play.
 |---|---|---|---|
 | `rollingDamping` | 0.15 | 0.15 | Attrito di rotolamento, in frazione di velocità persa al secondo. Agisce **solo sulle componenti orizzontali**, così una caduta resta una caduta libera. Alto = superficie ruvida/moquette, la palla si ferma subito; basso = ghiaccio. **Comanda la lunghezza dei tiri più di ogni altro numero.** |
 | `stopThreshold` | 0.4 | 0.4 | Sotto questa velocità (m/s) la palla viene azzerata di netto, velocità lineare e angolare. Serve a non aspettare l'eternità che una sfera quasi ferma si fermi davvero. **Attenzione: questa soglia è anche la definizione di "palla ferma" per tutto il gioco** — `IsStopped` la espone e `SkullAimController` la legge per decidere quando puoi tirare di nuovo. Alzarla rende il gioco più reattivo fra un tiro e l'altro ma tronca i rotolamenti lenti; abbassarla dà tiri lunghi e attese noiose. |
-| `collisionSpeedLoss` | 0.35 | 0.35 | Frazione di velocità persa in un urto **perfettamente frontale** (range 0-1). Un urto di striscio perde molto meno, in proporzione al coseno dell'angolo d'impatto: così rotolare lungo un muro non frena. `0` disattiva del tutto la perdita e lascia fare a PhysX. |
+| `collisionSpeedLoss` | 0.12 | 0.35 | Frazione di velocità persa in un urto **perfettamente frontale** (range 0-1). Un urto di striscio perde molto meno, in proporzione al coseno dell'angolo d'impatto: così rotolare lungo un muro non frena. `0` disattiva del tutto la perdita e lascia fare a PhysX. **Si somma a quello che PhysX ha già tolto** (vedi cap. 13, Bounciness): tenerla alta significa frenare due volte. |
 | `minImpactSpeed` | 1 | 1 | Sotto questa velocità d'impatto (m/s) l'urto non conta. Evita che i micro-contatti col pavimento fermino la palla. Se la palla "si incolla" toccando le pareti, alzalo. |
 
 ---
@@ -426,16 +426,35 @@ I nemici hanno Rigidbody con Linear Damping `0`: volano più liberamente quando 
 
 `Assets/Graphic assets/Materials/`
 
-| Materiale | Dynamic Friction | Static Friction | Bounciness | Su cosa |
-|---|---|---|---|---|
-| `Player/Skull_player` | 0.2 | 0.2 | 0 | SphereCollider del teschio |
-| `Environment/Base_ground` | 0.3 | 0.6 | 0 | il terreno |
+| Materiale | Dynamic Friction | Static Friction | Bounciness | Combine | Su cosa |
+|---|---|---|---|---|---|
+| `Player/Skull_player` | 0.2 | 0.2 | 0 | Average | SphereCollider del teschio |
+| `Environment/Base_ground` | 0.3 | 0.6 | 0 | Average | MeshCollider di `Test_World` |
+| `Environment/Wall` | 0.05 | 0.05 | 0.8 | Friction Minimum, Bounce Maximum | sponde: **da assegnare** a `wall` |
+| *(nessun materiale)* | 0.6 | 0.6 | 0 | Average | `wall`, i tre `Enemy`, `Lava`, gli `Hole_opener` |
 
-`Bounciness = 0` ovunque: **niente rimbalzi**. Alzarla sul teschio (0,3-0,5) darebbe un gioco
-molto più caotico, da flipper. È una scelta di design grossa, da fare consapevolmente.
+> **La riga più importante è l'ultima.** Un collider senza physic material usa il
+> **Default Material di PhysX**: attrito 0,6 — il **triplo** del teschio — e nessun rimbalzo.
+> Le pareti e i nemici oggi sono tutti così.
 
-Ricorda che l'attrito PhysX **non ferma una sfera che rotola** (vedi `SkullRolling`): agisce
-sullo strisciamento e sugli urti contro le pareti, non sul rotolamento libero.
+### Perché la palla si pianta contro i muri
+
+`Bounciness = 0` non è "rimbalza poco": è **restituzione zero**, cioè PhysX azzera *tutta*
+la componente di velocità lungo la normale dell'urto. Un colpo perfettamente frontale contro
+un muro ferma la palla di netto, prima ancora che `SkullRolling` faccia qualcosa. Poi arrivano
+l'attrito 0,6 del Default Material sulla componente tangenziale e infine
+`collisionSpeedLoss`: **tre frenate sovrapposte**.
+
+Per un feeling da biliardo servono sponde elastiche: è a questo che serve
+`Environment/Wall` (Bounciness 0,8 con Bounce Combine **Maximum**, così vince sullo 0 del
+teschio, e attrito 0,05 con Friction Combine **Minimum**, così le sponde non raspano).
+Va assegnato al collider di `wall` e a tutte le pareti future.
+
+L'alternativa è alzare la Bounciness sul **teschio**: funziona contro tutto, ma lo fa
+rimbalzare anche cadendo a terra, che è un gioco diverso — più flipper che biliardo.
+
+Ricorda infine che l'attrito PhysX **non ferma una sfera che rotola** (vedi `SkullRolling`):
+agisce sullo strisciamento e sugli urti, non sul rotolamento libero.
 
 ### Project Settings → Physics
 
@@ -450,6 +469,8 @@ Non toccati finora, ma sono leve reali se il gioco dovesse diventare impreciso:
 
 | Voglio... | Tocco |
 |---|---|
+| La palla non si pianta contro i muri | assegna `Environment/Wall` ai collider delle pareti, poi `SkullRolling.collisionSpeedLoss` ↓ — in quest'ordine, vedi cap. 13 |
+| Il teschio prosegue dopo aver colpito un nemico | `SkullExplosion.freezeSkullOnExplode` **off** (di default si ferma di proposito) |
 | Tiri più lunghi | `maxPower` ↑ oppure `SkullRolling.rollingDamping` ↓ (ricorda il Linear Damping del Rigidbody) |
 | Livelli che durano più tiri | `SkullIntegrity.wearPerMeter` ↓ — è la leva più diretta e non cambia il feeling del colpo |
 | Tiro più difficile da azzeccare | `SkullAimController.powerSpeed` ↑ |

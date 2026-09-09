@@ -8,7 +8,10 @@ public class SkullRolling : MonoBehaviour
     public float stopThreshold = 0.4f;    // sotto questa velocita' si ferma del tutto
 
     [Header("Perdita di velocita' negli urti")]
-    [Range(0f, 1f)] public float collisionSpeedLoss = 0.35f; // frazione persa in un urto frontale
+    // Attenzione: questa perdita si somma a quella che ha gia' applicato PhysX.
+    // Con Bounciness 0 sui physic material il solver azzera da solo tutta la
+    // componente normale, quindi tenerla alta significa frenare due volte.
+    [Range(0f, 1f)] public float collisionSpeedLoss = 0.12f; // frazione persa in un urto frontale
     public float minImpactSpeed = 1f;     // sotto questa velocita' l'urto non conta
 
     public bool IsStopped => rb.linearVelocity.sqrMagnitude < stopThreshold * stopThreshold;
