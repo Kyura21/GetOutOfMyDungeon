@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 8758795323614115626}
   - component: {fileID: 1179813676889400117}
   - component: {fileID: 6508657199006940987}
+  - component: {fileID: 1435947941439469299}
   - component: {fileID: 2015693174799092802}
   m_Layer: 0
   m_Name: Enemy_Explosive
@@ -141,7 +142,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   damageScore: 300
-  explosionVFX: {fileID: 0}
+  explosionVFX: {fileID: 950183076284005824, guid: 3dc18abe7d7492745b585a8bc54a24ac, type: 3}
   destroyDelay: 0.2
   onExploded:
     m_PersistentCalls:
@@ -162,9 +163,9 @@ MonoBehaviour:
   powerReward: 1
   damageScorePerHP: 100
   damageScoreOnKill: 250
-  deathVFX: {fileID: 0}
+  deathBehaviour: 2
+  deathVFX: {fileID: 950183076284005824, guid: 3dc18abe7d7492745b585a8bc54a24ac, type: 3}
   deathDelay: 0.1
-  destroyOnDeath: 1
   flashOnHit: 1
   flashColor: {r: 1, g: 0, b: 0, a: 1}
   flashDuration: 0.15
@@ -172,6 +173,28 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   onDied:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1435947941439469299
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5297861249091373635}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dfb02f5cdef3384a97b769d4faa6560, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyWreck
+  knockOnDamage: 1
+  knockOnDeath: 1
+  impactDamage: 1
+  minImpactSpeed: 4
+  impactCooldown: 0.2
+  impactScore: 50
+  lifetime: -1
+  onKnocked:
     m_PersistentCalls:
       m_Calls: []
 --- !u!136 &2015693174799092802

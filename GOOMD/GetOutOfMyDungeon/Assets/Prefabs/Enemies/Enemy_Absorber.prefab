@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1634439330738752866}
   - component: {fileID: 9196513004225956580}
   - component: {fileID: 5072414722751624355}
+  - component: {fileID: 1028025200289644409}
   m_Layer: 0
   m_Name: Enemy_Absorber
   m_TagString: enemy
@@ -176,9 +177,9 @@ MonoBehaviour:
   powerReward: 1
   damageScorePerHP: 100
   damageScoreOnKill: 250
-  deathVFX: {fileID: 0}
+  deathBehaviour: 2
+  deathVFX: {fileID: 950183076284005824, guid: 3dc18abe7d7492745b585a8bc54a24ac, type: 3}
   deathDelay: 0.1
-  destroyOnDeath: 1
   flashOnHit: 1
   flashColor: {r: 1, g: 0, b: 0, a: 1}
   flashDuration: 0.15
@@ -186,5 +187,27 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   onDied:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &1028025200289644409
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7793268785360991070}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7dfb02f5cdef3384a97b769d4faa6560, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyWreck
+  knockOnDamage: 1
+  knockOnDeath: 1
+  impactDamage: 1
+  minImpactSpeed: 4
+  impactCooldown: 0.2
+  impactScore: 50
+  lifetime: -1
+  onKnocked:
     m_PersistentCalls:
       m_Calls: []
