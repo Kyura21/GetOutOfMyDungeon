@@ -72,6 +72,8 @@ public static class HUDBuilder
         BuildScores(root, hud);
         BuildObjectives(root, hud);
         BuildPowerMeter(root, hud);
+        BuildLoftMeter(root, hud);
+        BuildShotCamera(root);
         hud.winPanel = BuildEndPanel(root, hud, true);
         hud.losePanel = BuildEndPanel(root, hud, false);
 
@@ -83,8 +85,38 @@ public static class HUDBuilder
             UnityEngine.SceneManagement.SceneManager.GetActiveScene());
 
         Debug.Log("HUD creato e cablato. I riferimenti di gioco (GameManager, teschio, " +
-                  "SkullAimController) restano vuoti: l'HUDController li cerca da solo in Awake.",
+                  "SkullAimController) restano vuoti: l'HUDController li cerca da solo in Awake.\n" +
+                  "Creati anche Shot_Camera e Shot_Camera_Rig per la finestra della " +
+                  "telecronaca. Due cose da controllare: su Shot_Camera_Rig il campo 'player' " +
+                  "deve puntare alla capsula del personaggio, e se la finestra resta nera " +
+                  "aggiungi a Shot_Camera il componente Universal Additional Camera Data.",
                   canvasGO);
+    }
+
+    // Rifa' solo la barra di potenza dentro l'HUD gia' in scena. Rigenerare tutto
+    // l'HUD vorrebbe dire rifare anche la telecronaca e ricollegarla.
+    [MenuItem("GOOMD/Rifai barra potenza")]
+    public static void RebuildPowerMeter()
+    {
+        HUDController hud = Object.FindFirstObjectByType<HUDController>();
+        if (hud == null)
+        {
+            EditorUtility.DisplayDialog("HUD assente",
+                "In scena non c'e' un HUDController. Usa GOOMD > Crea HUD in scena.", "Ok");
+            return;
+        }
+
+        Transform old = hud.transform.Find("PowerMeter");
+        if (old != null) Undo.DestroyObjectImmediate(old.gameObject);
+
+        Undo.RecordObject(hud, "Rifai barra potenza");
+        BuildPowerMeter(hud.transform, hud);
+
+        Transform created = hud.transform.Find("PowerMeter");
+        if (created != null) Undo.RegisterCreatedObjectUndo(created.gameObject, "Rifai barra potenza");
+
+        EditorUtility.SetDirty(hud);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(hud.gameObject.scene);
     }
 
     // ---------- blocchi dell'HUD ----------
@@ -159,26 +191,121 @@ public static class HUDBuilder
         hud.holeIndicator = indicator.gameObject;
     }
 
-    // in basso al centro: si accende solo mentre si carica il tiro
+    // A sinistra, a meta' altezza: una barra verticale che si riempie dal basso,
+    // con la percentuale accanto che sale insieme al riempimento. Il modello e'
+    // Super Battle Golf (Reference/camerra position + aim.png). Si accende in mira.
     static void BuildPowerMeter(Transform root, HUDController hud)
     {
         RectTransform group = NewRect("PowerMeter", root);
-        Place(group, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(640f, 60f));
-
-        TextMeshProUGUI caption = NewText("Caption", group, "POTENZA", 22f,
-            TextAlignmentOptions.Center, InkDim);
-        Place(caption.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(640f, 26f));
+        Place(group, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(200f, -60f), new Vector2(56f, 440f));
 
         Image fill;
         Slider bar = NewBar("Bar", group, out fill);
-        StretchHorizontal(bar.GetComponent<RectTransform>(), -30f, 30f);
+        Stretch(bar.GetComponent<RectTransform>());
+        bar.direction = Slider.Direction.BottomToTop;
+
+        // il Fill di NewBar e' fatto per crescere in orizzontale: in verticale
+        // parte da una striscia piena in larghezza, alta zero
+        RectTransform fillRect = fill.rectTransform;
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = new Vector2(1f, 0f);
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
         bar.value = 0f;
+
+        // a sinistra della barra; HUDController ne sposta l'ancora in altezza
+        // seguendo la carica
+        TextMeshProUGUI value = NewText("Value", group, "0%", 30f,
+            TextAlignmentOptions.Right, Ink);
+        RectTransform vr = value.rectTransform;
+        vr.anchorMin = new Vector2(0f, 0f);
+        vr.anchorMax = new Vector2(0f, 0f);
+        vr.pivot = new Vector2(1f, 0.5f);
+        vr.anchoredPosition = new Vector2(-14f, 0f);
+        vr.sizeDelta = new Vector2(120f, 40f);
 
         group.gameObject.SetActive(false);
 
         hud.powerRoot = group.gameObject;
         hud.powerBar = bar;
         hud.powerFill = fill;
+        hud.powerLabel = value;
+    }
+
+    // L'angolo di tiro, scelto con la rotella. Sta sopra la barra di potenza
+    // perche' nella sequenza viene prima: si decide l'angolo, poi si carica.
+    static void BuildLoftMeter(Transform root, HUDController hud)
+    {
+        RectTransform group = NewRect("LoftMeter", root);
+        Place(group, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 140f), new Vector2(640f, 56f));
+
+        TextMeshProUGUI caption = NewText("Caption", group, "ANGOLO", 22f,
+            TextAlignmentOptions.Left, InkDim);
+        Place(caption.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, new Vector2(300f, 26f));
+
+        TextMeshProUGUI value = NewText("Value", group, "0 gradi", 22f,
+            TextAlignmentOptions.Right, Ink);
+        Place(value.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), Vector2.zero, new Vector2(300f, 26f));
+
+        Image fill;
+        Slider bar = NewBar("Bar", group, out fill);
+        StretchHorizontal(bar.GetComponent<RectTransform>(), -30f, 18f);
+        bar.value = 0f;
+        fill.color = new Color(0.4f, 0.8f, 1f);
+
+        group.gameObject.SetActive(false);
+
+        hud.loftRoot = group.gameObject;
+        hud.loftLabel = value;
+        hud.loftBar = bar;
+    }
+
+    // La finestrella della telecronaca, in basso a destra, e la camera che la
+    // riempie. Si accende da sola quando un colpo prende la testa.
+    //
+    // Non e' cablata su HUDController: la gestisce ShotCamera, che non e' UI. Qui
+    // si costruisce solo la cornice e si collega il tutto.
+    static void BuildShotCamera(Transform root)
+    {
+        RectTransform frame = NewRect("ShotCamera", root);
+        Place(frame, new Vector2(1f, 0f), new Vector2(1f, 0f),
+              new Vector2(-40f, 40f), new Vector2(440f, 288f));
+
+        // fondo scuro: senza, la finestra non si stacca dallo sfondo del gioco
+        Image backdrop = NewImage("Backdrop", frame, Veil);
+        Stretch(backdrop.rectTransform);
+
+        RectTransform viewRect = NewRect("View", frame);
+        Place(viewRect, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+              new Vector2(0f, 8f), new Vector2(424f, 238f));
+
+        RawImage view = viewRect.gameObject.AddComponent<RawImage>();
+        view.raycastTarget = false;
+
+        TextMeshProUGUI caption = NewText("Caption", frame, "IL TIRO", 20f,
+            TextAlignmentOptions.Center, InkDim);
+        Place(caption.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+              new Vector2(0f, -6f), new Vector2(424f, 24f));
+
+        frame.gameObject.SetActive(false);
+
+        // la camera che riempie la finestra. Resta spenta finche' non serve: una
+        // camera accesa disegna la scena a ogni frame anche se non la guardi.
+        GameObject camGO = new GameObject("Shot_Camera", typeof(Camera));
+        Camera cam = camGO.GetComponent<Camera>();
+        cam.enabled = false;
+
+        GameObject rigGO = new GameObject("Shot_Camera_Rig");
+        ShotCamera rig = rigGO.AddComponent<ShotCamera>();
+        rig.shotCamera = cam;
+        rig.display = view;
+        rig.frame = frame.gameObject;
+
+        PlayerController found = Object.FindFirstObjectByType<PlayerController>();
+        if (found != null) rig.player = found.transform;
+
+        Undo.RegisterCreatedObjectUndo(camGO, "Crea HUD");
+        Undo.RegisterCreatedObjectUndo(rigGO, "Crea HUD");
     }
 
     static GameObject BuildEndPanel(Transform root, HUDController hud, bool win)

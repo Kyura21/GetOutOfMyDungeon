@@ -35,6 +35,19 @@ public class HUDController : MonoBehaviour
     public Image powerFill;
     public Gradient powerGradient;
     public bool showWhileAiming = true;  // mostra la barra a zero gia' in mira
+    public TMP_Text powerLabel;          // la percentuale di carica
+    public string powerFormat = "{0:0}%";
+    // la percentuale sale insieme al riempimento, accanto alla barra. Serve una
+    // barra verticale e un'etichetta ancorata in basso (come la crea il generatore)
+    public bool powerLabelFollowsFill = true;
+
+    [Header("Angolo di tiro")]
+    // L'angolo si sceglie con la rotella in mira. Il ventaglio col gizmo si
+    // vede solo in editor, quindi in gioco serve un numero da leggere.
+    public GameObject loftRoot;          // acceso solo mentre si mira o si carica
+    public TMP_Text loftLabel;
+    public string loftFormat = "{0:0} gradi";
+    public Slider loftBar;               // opzionale: l'angolo sul ventaglio, 0..1
 
     [Header("Punteggi")]
     public TMP_Text damageText;
@@ -92,6 +105,7 @@ public class HUDController : MonoBehaviour
         if (winPanel != null) winPanel.SetActive(false);
         if (losePanel != null) losePanel.SetActive(false);
         if (powerRoot != null) powerRoot.SetActive(false);
+        if (loftRoot != null) loftRoot.SetActive(false);
         if (holeIndicator != null) holeIndicator.SetActive(false);
     }
 
@@ -99,6 +113,7 @@ public class HUDController : MonoBehaviour
     {
         UpdateIntegrity();
         UpdatePower();
+        UpdateLoft();
         UpdateScores();
         UpdateObjectives();
         UpdateEndPanels();
@@ -151,6 +166,39 @@ public class HUDController : MonoBehaviour
         if (powerBar != null) powerBar.value = ratio;
         if (powerFill != null && powerGradient != null)
             powerFill.color = powerGradient.Evaluate(ratio);
+
+        if (powerLabel != null)
+        {
+            powerLabel.text = string.Format(powerFormat, ratio * 100f);
+
+            if (powerLabelFollowsFill)
+            {
+                RectTransform rt = powerLabel.rectTransform;
+                rt.anchorMin = new Vector2(rt.anchorMin.x, ratio);
+                rt.anchorMax = new Vector2(rt.anchorMax.x, ratio);
+            }
+        }
+    }
+
+    // L'angolo resta scritto anche durante Powering: e' stato confermato, ma
+    // il giocatore deve poter ricordare con che angolo sta per tirare.
+    void UpdateLoft()
+    {
+        if (aim == null) return;
+
+        bool visible = aim.CurrentState == SkullAimController.State.Aiming
+                       || aim.CurrentState == SkullAimController.State.Powering;
+
+        if (loftRoot != null && loftRoot.activeSelf != visible)
+            loftRoot.SetActive(visible);
+
+        if (!visible) return;
+
+        if (loftLabel != null)
+            loftLabel.text = string.Format(loftFormat, aim.LoftAngle);
+
+        if (loftBar != null)
+            loftBar.value = Mathf.Clamp01(aim.LoftRatio);
     }
 
     void UpdateScores()

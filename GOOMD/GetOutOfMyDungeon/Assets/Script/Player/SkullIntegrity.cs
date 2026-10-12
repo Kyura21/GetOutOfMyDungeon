@@ -13,6 +13,12 @@ public class SkullIntegrity : MonoBehaviour
     public float wearPerMeter = 1f;   // quanta integrita' costa un metro percorso
     public float fragility = 1f;      // 0 = usura costante, 1 = a fine vita consuma il doppio
 
+    // Da quando il tiro e' in stile golf il teschio vola, e in volo il moto
+    // orizzontale continua: senza questo moltiplicatore un metro in aria
+    // costerebbe come un metro strisciato per terra, che non e' rotolamento.
+    // 0 = volare e' gratis, 1 = logora come il terreno.
+    [Range(0f, 1f)] public float airWearMultiplier = 0f;
+
     [Header("Usura da urti")]
     public float wearPerImpact = 0f;  // costo di un urto frontale, 0 = solo rotolamento
     public float minImpactSpeed = 2f;
@@ -27,10 +33,12 @@ public class SkullIntegrity : MonoBehaviour
 
     private Rigidbody rb;
     private Vector3 lastVelocity;
+    private SkullRolling rolling;   // da lui arriva il contatto col terreno
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        rolling = GetComponent<SkullRolling>();
         Current = maxIntegrity;
     }
 
@@ -42,6 +50,12 @@ public class SkullIntegrity : MonoBehaviour
 
         // solo il moto orizzontale: una caduta non e' rotolamento
         float distance = new Vector2(v.x, v.z).magnitude * Time.fixedDeltaTime;
+
+        // in volo il moto orizzontale c'e' ancora, ma non e' strisciare:
+        // il costo passa per airWearMultiplier (0 = volare non logora)
+        if (rolling != null && rolling.IsAirborne)
+            distance *= airWearMultiplier;
+
         if (distance > 0f && wearPerMeter > 0f)
             ApplyWear(distance * wearPerMeter);
 

@@ -62,6 +62,15 @@ Thumbs.db
 desktop.ini
 
 # ---------------------------------------------------------------
+# Obsidian: il vault della documentazione sta in Docs/GetOutOfMyDungeon.
+# Le note vanno versionate, la disposizione delle finestre no: workspace.json
+# cambia a ogni apertura di Obsidian e sporcherebbe ogni commit.
+# ---------------------------------------------------------------
+Docs/GetOutOfMyDungeon/.obsidian/workspace.json
+Docs/GetOutOfMyDungeon/.obsidian/workspace-mobile.json
+Docs/GetOutOfMyDungeon/.obsidian/cache
+
+# ---------------------------------------------------------------
 # Non ignorare i .meta: Unity li usa per legare GUID e asset.
 # Perderli rompe tutti i riferimenti in scena.
 # ---------------------------------------------------------------
