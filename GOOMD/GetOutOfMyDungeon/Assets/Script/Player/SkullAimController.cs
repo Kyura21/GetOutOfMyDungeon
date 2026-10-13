@@ -1,19 +1,24 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 // Il tiro, modello golf: direzione + angolo in altezza + potenza.
 //
 // Sequenza di input:
 //   Idle     -> PlayerController entra in mira finche' si TIENE premuto il tasto destro
-//   Aiming   -> la ROTELLA alza e abbassa l'angolo. La direzione parte da dove guarda
-//               il personaggio e si riallinea a dove guarda la camera.
+//   Aiming   -> la direzione parte da dove guarda il personaggio e si riallinea a
+//               dove guarda la camera.
 //               Premendo il tasto sinistro l'angolo e' confermato e parte la carica.
-//   Powering -> piu' si tiene premuto, piu' si carica. Si tira RILASCIANDO,
-//               e si torna subito Idle.
+//   Powering -> piu' si tiene premuto, piu' si carica, fino al 110%. Si tira
+//               RILASCIANDO, e si torna subito Idle. Al 100% e' il colpo perfetto,
+//               oltre la palla va a cercare un nemico (SkullHoming).
 //
 // Dopo il tiro non si aspetta che la palla si fermi: il personaggio torna libero
 // appena finisce lo swing. Prima c'era uno stato Shot che lo bloccava finche' la
 // palla rotolava. Vedi lo Storico.
+//
+// L'ANGOLO si sceglie in ogni stato tranne Powering: ROTELLA, oppure gli angoli
+// fissi sul tastierino numerico (loftPresets).
 //
 // Lasciare il tasto destro annulla, vedi CancelAim().
 //
@@ -33,8 +38,12 @@ public class SkullAimController : MonoBehaviour
 {
     public enum State { Idle, Aiming, Powering }
 
-    // dove si e' fermata la carica: lo leggono HUD e punteggio
-    public enum PowerZone { Normal, Bottom, Top }
+    // dove si e' fermata la carica: lo leggono HUD, PlayerSwing e punteggio
+    //   Weak       carica sotto weakTolerance: colpetto a potenza fissa
+    //   Normal     potenza proporzionale alla carica
+    //   Perfect    100% +- perfectTolerance: potenza in piu', nemici giu' piu' a lungo
+    //   Overcharge oltre: la palla diventa a ricerca (SkullHoming), nemici giu' piu' a lungo
+    public enum PowerZone { Normal, Weak, Perfect, Overcharge }
 
     [Header("Riferimenti")]
     public Transform ball;                  // la testa-palla
@@ -42,34 +51,51 @@ public class SkullAimController : MonoBehaviour
     public Transform cameraTransform;       // da' la direzione del tiro. Vuoto = Camera.main
     public PlayerSwing swing;               // da lui arrivano la portata della mazza e lo swing
     public SkullExplosion skullExplosion;   // se vuoto lo prendo dalla palla
+    public SkullHoming homing;              // se vuoto lo prendo dalla palla, o lo aggiungo
 
     [Header("Direzione")]
     // All'ingresso in mira la direzione e' quella del corpo, poi ruota verso la
     // camera a questa velocita'. 0 = salta subito sulla camera.
     public float aimAlignSpeed = 360f;      // gradi al secondo
 
-    [Header("Angolo di tiro (rotella)")]
+    // L'angolo si sceglie sempre, anche camminando: si arriva in mira con l'angolo
+    // gia' pronto. Si blocca solo durante la carica, dove e' confermato.
+    [Header("Angolo di tiro (rotella e tastierino)")]
     public float minLoftAngle = 0f;         // 0 = tiro raso
     public float maxLoftAngle = 55f;        // il massimo, in gradi
-    [Range(0f, 1f)] public float startLoftRatio = 0f;        // angolo con cui si entra in mira
+    [Range(0f, 1f)] public float startLoftRatio = 0f;        // angolo a inizio livello
+    // Angoli fissi sui tasti numerici (riga in alto e tastierino): il primo va sul
+    // tasto 1, il secondo sul 2 e cosi' via, fino a 9. In frazione del ventaglio:
+    // 0 = minLoftAngle, 1 = maxLoftAngle.
+    public float[] loftPresets = { 0f, 0.25f, 0.45f, 0.7f, 1f };
     [Range(0f, 1f)] public float loftPerRevolution = 0.25f;  // quanto cambia in un giro di rotella
     public float notchesPerRevolution = 24f; // scatti in un giro di rotella (mouse comuni: 24)
     public float loftSmooth = 14f;           // 0 = l'angolo salta di scatto
     public bool showAimGizmo = true;
 
+    // La carica va da 0 al 100% in chargeTime secondi, poi continua fino a
+    // 100% + overchargeMax nello stesso ritmo, e li' si ferma. Il colpo perfetto e'
+    // al 100%: andare oltre non e' "di piu'", e' un altro colpo (la palla a ricerca).
+    // Per questo e' una prova di tempismo: tenendo premuto si supera il perfetto.
     [Header("Potenza (si carica tenendo premuto)")]
-    public float maxPower = 20f;
-    public float chargeTime = 1.2f;         // secondi di pressione per arrivare al massimo
+    public float maxPower = 20f;            // impulso al 100% della carica
+    public float chargeTime = 1.2f;         // secondi per arrivare al 100%
+    [Range(0f, 1f)] public float overchargeMax = 0.1f;  // 0.1 = la carica arriva al 110%, in 1.1 x chargeTime
     public float forceMultiplier = 1f;
 
-    [Header("Zone agli estremi della carica")]
-    // Tenendo premuto si arriva al massimo da soli, quindi queste zone non sono piu'
-    // una prova di tempismo come erano con la barra oscillante: la zona alta la prende
-    // chiunque aspetti. Per questo zoneWidth parte da 0, cioe' spente.
-    [Range(0f, 0.49f)] public float zoneWidth = 0f;
-    public float topZoneMultiplier = 1.3f;
-    public float bottomZoneMultiplier = 1f;
-    [Range(0f, 1f)] public float bottomZonePower = 0.12f;  // la carica a zero non farebbe partire il tiro
+    [Header("Zone della carica")]
+    [FormerlySerializedAs("zoneWidth")]
+    [Range(0f, 0.9f)] public float weakTolerance = 0.07f;   // carica fino a qui = colpo debole. 0 = spento
+    [FormerlySerializedAs("bottomZonePower")]
+    [Range(0f, 1f)] public float weakPower = 0.12f;         // potenza fissa del colpo debole
+    [FormerlySerializedAs("bottomZoneMultiplier")]
+    public float weakMultiplier = 1f;
+    [Range(0f, 0.5f)] public float perfectTolerance = 0.03f; // 100% +- questo = colpo perfetto
+    [FormerlySerializedAs("topZoneMultiplier")]
+    public float perfectMultiplier = 1.3f;                   // boost di potenza del colpo perfetto
+    // potenza oltre il 100%: la palla piu' veloce del gioco, a ricerca o no.
+    // Tienilo sopra perfectMultiplier. Piu' e' alto, piu' la curva a ricerca e' piatta
+    public float overchargeMultiplier = 1.6f;
 
 
     [Header("Anteprima della traiettoria (tratteggio)")]
@@ -97,11 +123,14 @@ public class SkullAimController : MonoBehaviour
     public float LoftAngle => Mathf.Lerp(minLoftAngle, maxLoftAngle, loftRatio);
     public float LoftRatio => loftRatio;
 
-    public float CurrentPower => currentPower;
-    public float PowerRatio => maxPower > 0f ? currentPower / maxPower : 0f;
+    // la carica attuale: 1 = 100%, puo' arrivare a 1 + overchargeMax
+    public float ChargeRatio => chargeRatio;
+    public float MaxChargeRatio => 1f + overchargeMax;
+    public PowerZone CurrentZone => ZoneOf(chargeRatio);
 
     public PowerZone LastShotZone { get; private set; } = PowerZone.Normal;
     public float LastShotImpulse { get; private set; }
+    public bool LastShotHoming { get; private set; }   // la palla e' partita a ricerca
 
     // Vero se l'ultimo colpo ha davvero preso la testa. Se la mazza ha mulinato a
     // vuoto e' falso, e la testa non si e' mossa. Lo legge ShotCamera per decidere
@@ -114,7 +143,7 @@ public class SkullAimController : MonoBehaviour
     public int BallHits { get; private set; }
 
     private Vector3 shotDirection = Vector3.forward;
-    private float currentPower;
+    private float chargeRatio;
     private float chargeTimer;
     private float loftRatio;      // angolo attuale, smussato
     private float targetLoft;     // angolo scelto con la rotella
@@ -126,8 +155,22 @@ public class SkullAimController : MonoBehaviour
     private readonly System.Collections.Generic.List<Rigidbody> flyingTargets
         = new System.Collections.Generic.List<Rigidbody>();
 
+    // stesso indice = stesso angolo: la riga in alto e il tastierino fanno uguale
+    private static readonly Key[] PresetKeys =
+    {
+        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
+        Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9
+    };
+    private static readonly Key[] PresetNumpadKeys =
+    {
+        Key.Numpad1, Key.Numpad2, Key.Numpad3, Key.Numpad4, Key.Numpad5,
+        Key.Numpad6, Key.Numpad7, Key.Numpad8, Key.Numpad9
+    };
+
     void Start()
     {
+        targetLoft = loftRatio = Mathf.Clamp01(startLoftRatio);
+
         if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
 
@@ -135,6 +178,14 @@ public class SkullAimController : MonoBehaviour
 
         if (ball != null && skullExplosion == null)
             skullExplosion = ball.GetComponent<SkullExplosion>();
+
+        // la palla a ricerca: se la testa non ha il componente lo aggiungo coi
+        // valori di default. Mettilo su Skull_player per tararlo
+        if (ball != null && homing == null)
+        {
+            homing = ball.GetComponent<SkullHoming>();
+            if (homing == null) homing = ball.gameObject.AddComponent<SkullHoming>();
+        }
 
         // il collider serve a sapere se la mazza tocca la palla; il raggio a far
         // partire la traiettoria a vuoto all'altezza giusta
@@ -193,6 +244,10 @@ public class SkullAimController : MonoBehaviour
         minLoftAngle = Mathf.Clamp(minLoftAngle, 0f, maxLoftAngle);
         notchesPerRevolution = Mathf.Max(1f, notchesPerRevolution);
         chargeTime = Mathf.Max(0.05f, chargeTime);
+        // il perfetto non puo' mangiarsi tutta la zona oltre il 100%, e il debole
+        // non puo' arrivare al perfetto
+        perfectTolerance = Mathf.Clamp(perfectTolerance, 0f, overchargeMax);
+        weakTolerance = Mathf.Clamp(weakTolerance, 0f, Mathf.Max(0f, 1f - perfectTolerance - 0.01f));
         trajectorySteps = Mathf.Max(2, trajectorySteps);
         trajectoryStep = Mathf.Max(0.005f, trajectoryStep);
     }
@@ -220,9 +275,8 @@ public class SkullAimController : MonoBehaviour
 
         if (swing != null) swing.BeginStance(shotDirection);
 
-        // l'angolo riparte dal default e non da quello del tiro precedente:
-        // un colpo alto rimasto in memoria sarebbe una sorpresa
-        targetLoft = loftRatio = Mathf.Clamp01(startLoftRatio);
+        // l'angolo NON riparte dal default: il giocatore lo sceglie anche fuori
+        // dalla mira, e deve trovarlo dove l'ha lasciato
 
         UpdateDirection();
         UpdateTrajectory(1f);
@@ -237,7 +291,7 @@ public class SkullAimController : MonoBehaviour
         if (CurrentState != State.Aiming && CurrentState != State.Powering) return;
 
         CurrentState = State.Idle;
-        currentPower = 0f;
+        chargeRatio = 0f;
         chargeTimer = 0f;
 
         if (swing != null) swing.EndStance();
@@ -246,6 +300,15 @@ public class SkullAimController : MonoBehaviour
 
     void Update()
     {
+        // l'angolo si sceglie sempre, tranne in carica, dove e' gia' confermato
+        bool playing = GameManager.Instance == null || GameManager.Instance.IsPlaying;
+        if (playing && CurrentState != State.Powering)
+        {
+            ReadLoftScroll();
+            ReadLoftPresets();
+            UpdateLoftSmoothing();
+        }
+
         switch (CurrentState)
         {
             case State.Idle:
@@ -253,8 +316,6 @@ public class SkullAimController : MonoBehaviour
 
             case State.Aiming:
                 UpdateDirection();
-                ReadLoftScroll();
-                UpdateLoftSmoothing();
                 // in mira l'anteprima mostra il tiro a potenza piena: dice fin dove
                 // si arriverebbe con quell'angolo dando tutto
                 UpdateTrajectory(1f);
@@ -268,16 +329,17 @@ public class SkullAimController : MonoBehaviour
 
                     CurrentState = State.Powering;
                     chargeTimer = 0f;
-                    currentPower = 0f;
+                    chargeRatio = 0f;
                 }
                 break;
 
             case State.Powering:
                 // la direzione resta viva: la camera gira col mouse e il tiro la segue,
-                // cosi' quello che vedi e' quello che tiri
+                // cosi' quello che vedi e' quello che tiri. L'angolo invece e' fermo:
+                // per cambiarlo si lascia la mira
                 UpdateDirection();
                 UpdateCharge();
-                UpdateTrajectory(PowerRatio);
+                UpdateTrajectory(chargeRatio);
 
                 if (Mouse.current != null && Mouse.current.leftButton.wasReleasedThisFrame)
                 {
@@ -328,6 +390,24 @@ public class SkullAimController : MonoBehaviour
         targetLoft = Mathf.Clamp01(targetLoft + notches * perNotch);
     }
 
+    // Tasti numerici, riga in alto o tastierino: 1 = primo angolo fisso, 2 = secondo, ecc.
+    // Passa per la smussatura come la rotella, cosi' la barra scorre e non scatta.
+    void ReadLoftPresets()
+    {
+        Keyboard kb = Keyboard.current;
+        if (kb == null || loftPresets == null) return;
+
+        int n = Mathf.Min(loftPresets.Length, PresetKeys.Length);
+        for (int i = 0; i < n; i++)
+        {
+            if (!kb[PresetKeys[i]].wasPressedThisFrame && !kb[PresetNumpadKeys[i]].wasPressedThisFrame)
+                continue;
+
+            targetLoft = Mathf.Clamp01(loftPresets[i]);
+            return;
+        }
+    }
+
     void UpdateLoftSmoothing()
     {
         loftRatio = loftSmooth > 0f
@@ -335,30 +415,38 @@ public class SkullAimController : MonoBehaviour
             : targetLoft;
     }
 
-    // La potenza sale finche' si tiene premuto e si ferma al massimo.
+    // La carica sale allo stesso ritmo fino al 100% e oltre, e si ferma al massimo
+    // (100% + overchargeMax).
     void UpdateCharge()
     {
         chargeTimer += Time.deltaTime;
-        currentPower = maxPower * Mathf.Clamp01(chargeTimer / Mathf.Max(0.05f, chargeTime));
+        chargeRatio = Mathf.Min(chargeTimer / Mathf.Max(0.05f, chargeTime), MaxChargeRatio);
     }
 
     void Shoot()
     {
-        float charge = PowerRatio;
+        float charge = chargeRatio;
         float impulse = ResolveImpulse(charge, out PowerZone zone);
 
         // La mazza colpisce solo quello che ha davanti. Se la testa non e' a
         // portata il colpo va a vuoto: la mazza mulina e la testa non si muove.
         bool hitsBall = BallInReach;
 
+        // oltre il 100% la palla va a cercare il primo nemico davanti. Se non ce
+        // n'e' nessuno parte dritta con l'angolo scelto, alla stessa potenza
+        EnemyHealth target = hitsBall && zone == PowerZone.Overcharge && homing != null
+            ? homing.FindTarget(ball.position, shotDirection)
+            : null;
+
         LastShotZone = zone;
         LastShotHitBall = hitsBall;
         LastShotImpulse = hitsBall ? impulse : 0f;
+        LastShotHoming = target != null;
 
         // lo swing si vede sempre, anche a vuoto. Tutto quello che sta nel cerchio
         // viene colpito insieme alla palla e spinto lungo il tiro: nemici, e in
         // futuro gli oggetti di scena
-        if (swing != null) swing.OnShotReleased(charge, LaunchDirection);
+        if (swing != null) swing.OnShotReleased(charge, LaunchDirection, zone);
 
         if (!hitsBall) return;
 
@@ -368,37 +456,44 @@ public class SkullAimController : MonoBehaviour
         if (skullExplosion != null)
             skullExplosion.ResetExplosion();
 
+        // un tiro nuovo spegne la ricerca del tiro prima
+        if (homing != null) homing.Stop();
+
         // la velocita' vecchia va buttata: sommare l'impulso a una palla che si
         // muoveva ancora darebbe tiri imprevedibili
         ballRb.linearVelocity = Vector3.zero;
         ballRb.angularVelocity = Vector3.zero;
 
-        ballRb.AddForce(LaunchDirection * impulse, ForceMode.Impulse);
+        if (target != null) homing.Launch(target, impulse / Mathf.Max(0.0001f, ballRb.mass));
+        else ballRb.AddForce(LaunchDirection * impulse, ForceMode.Impulse);
     }
 
-    // Da "quanto ho caricato" (0..1) all'impulso da dare al Rigidbody.
-    // Con zoneWidth a 0 e' una proporzione diretta: carica piena = maxPower.
-    public float ResolveImpulse(float chargeRatio, out PowerZone zone)
+    // In che zona cade una carica (1 = 100%).
+    public PowerZone ZoneOf(float charge)
     {
-        chargeRatio = Mathf.Clamp01(chargeRatio);
-        zone = PowerZone.Normal;
+        if (charge > 1f + perfectTolerance) return PowerZone.Overcharge;
+        if (charge >= 1f - perfectTolerance) return PowerZone.Perfect;
+        if (weakTolerance > 0f && charge <= weakTolerance) return PowerZone.Weak;
+        return PowerZone.Normal;
+    }
 
-        float shaped = chargeRatio;
-        float multiplier = 1f;
+    // Da "quanto ho caricato" (1 = 100%) all'impulso da dare al Rigidbody.
+    // Nella zona normale e' una proporzione diretta. Oltre il 100% e' la palla piu'
+    // veloce del gioco (overchargeMultiplier), e se c'e' un nemico davanti lo cerca.
+    public float ResolveImpulse(float charge, out PowerZone zone)
+    {
+        zone = ZoneOf(charge);
 
-        if (zoneWidth > 0f && chargeRatio >= 1f - zoneWidth)
+        float shaped;
+        switch (zone)
         {
-            zone = PowerZone.Top;
-            multiplier = topZoneMultiplier;
-        }
-        else if (zoneWidth > 0f && chargeRatio <= zoneWidth)
-        {
-            zone = PowerZone.Bottom;
-            shaped = bottomZonePower;
-            multiplier = bottomZoneMultiplier;
+            case PowerZone.Weak:       shaped = weakPower * weakMultiplier; break;
+            case PowerZone.Perfect:    shaped = perfectMultiplier; break;
+            case PowerZone.Overcharge: shaped = overchargeMultiplier; break;
+            default:                   shaped = Mathf.Clamp01(charge); break;
         }
 
-        return maxPower * Mathf.Max(0f, shaped) * multiplier * forceMultiplier;
+        return maxPower * Mathf.Max(0f, shaped) * forceMultiplier;
     }
 
     // Ruota una direzione orizzontale verso l'alto dell'angolo dato.
@@ -458,7 +553,20 @@ public class SkullAimController : MonoBehaviour
         }
         else
         {
-            if (ballIn) used = DrawPath(ball.position, ballV0, used, perPath);
+            if (ballIn)
+            {
+                // oltre il 100% la palla non segue l'angolo: mostro la curva che
+                // farebbe verso il nemico agganciato
+                Vector3 v0 = ballV0;
+                if (ZoneOf(chargeRatio) == PowerZone.Overcharge && CurrentState == State.Powering
+                    && homing != null)
+                {
+                    EnemyHealth target = homing.FindTarget(ball.position, shotDirection);
+                    if (target != null) v0 = homing.LaunchVelocity(ball.position, target, ballV0.magnitude, out _);
+                }
+
+                used = DrawPath(ball.position, v0, used, perPath);
+            }
 
             Vector3 push = swing.PushImpulse(dir);
             for (int i = 0; i < flyingTargets.Count; i++)
@@ -610,7 +718,7 @@ public class SkullAimController : MonoBehaviour
             Gizmos.color = Color.green;
             Vector3 cur = LaunchDirection;
             Gizmos.DrawLine(origin, origin + cur * rayLength);
-            DrawGizmoArc(origin, cur * ResolveImpulse(PowerRatio, out _) / mass);
+            DrawGizmoArc(origin, cur * ResolveImpulse(chargeRatio, out _) / mass);
         }
     }
 

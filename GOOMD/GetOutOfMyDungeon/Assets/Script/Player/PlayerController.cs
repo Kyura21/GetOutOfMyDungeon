@@ -39,6 +39,11 @@ public class PlayerController : MonoBehaviour
     // sparata via dalla fisica. Vuoto = nessuna inclinazione.
     public Transform visual;
 
+    [Header("Palla")]
+    // Il corpo passa attraverso la palla: camminandole addosso o mettendosi in
+    // postura non la sposta. La palla si muove solo col colpo di mazza.
+    public bool ignoreBall = true;
+
     [Header("Velocita'")]
     public float walkSpeed = 4f;            // m/s camminando
     public float runSpeed = 7.5f;           // m/s con shift
@@ -150,6 +155,25 @@ public class PlayerController : MonoBehaviour
         if (aim == null) aim = FindFirstObjectByType<SkullAimController>();
         if (cameraTransform == null && Camera.main != null) cameraTransform = Camera.main.transform;
         if (cameraTransform != null) cameraController = cameraTransform.GetComponent<CameraController>();
+
+        if (ignoreBall && aim != null && aim.ball != null) IgnoreBall(aim.ball);
+    }
+
+    // Spegne gli urti fra tutti i collider del corpo e quelli della palla. Vale per
+    // sempre: Unity lo ricorda per ogni coppia, anche quando la capsula cambia altezza.
+    // I collider spenti (la mazza, vedi PlayerSwing) si saltano: non toccano niente.
+    void IgnoreBall(Transform ball)
+    {
+        Collider[] mine = GetComponentsInChildren<Collider>();
+        Collider[] theirs = ball.GetComponentsInChildren<Collider>();
+
+        foreach (Collider a in mine)
+        {
+            if (a == null || !a.enabled) continue;
+
+            foreach (Collider b in theirs)
+                if (b != null && b.enabled) Physics.IgnoreCollision(a, b, true);
+        }
     }
 
     void Update()

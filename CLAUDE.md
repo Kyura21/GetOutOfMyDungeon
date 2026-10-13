@@ -53,7 +53,7 @@ prima di "correggere" qualcosa che sembra strano: spesso e' strano per un motivo
 |---|---|
 | `Game_Controller` | `SkullAimController` |
 | `Main Camera` | `CameraController` |
-| `Skull_player` | `SkullExplosion` + `SkullRolling` + `SkullIntegrity`, SphereCollider (physic mat `Skull_player`), Rigidbody |
+| `Skull_player` | `SkullExplosion` + `SkullRolling` + `SkullIntegrity` + `SkullHoming`, SphereCollider (physic mat `Skull_player`), Rigidbody |
 | `Player` | capsula + CapsuleCollider + Rigidbody + `PlayerController` + `PlayerSwing` |
 | `Player_model` (figlio di `Player`) | la parte visibile, collegata a `PlayerController.visual`: si inclina nel tuffo |
 | `Skeletal_arm` (sotto `Player_model`) | la mazza, `PlayerSwing.clubPivot`. Ha un CapsuleCollider che `PlayerSwing` **spegne** all'avvio |
@@ -62,15 +62,13 @@ prima di "correggere" qualcosa che sembra strano: spesso e' strano per un motivo
 | `Game_Manager` | `GameManager` |
 | `HUD` (Canvas) | `HUDController` — generato da `GOOMD > Crea HUD in scena` |
 | `Shot_Camera`, `Shot_Camera_Rig` | la telecronaca, `ShotCamera` sul rig |
-| `Enemy`, `Enemy (1)`, `Enemy (2)` | cubi, tag `enemy`, `EnemyHealth`, BoxCollider + Rigidbody |
+| `Enemy`, `Enemy (1)`, `Enemy (2)` | cubi, tag `enemy`, `EnemyHealth`, BoxCollider + Rigidbody. `EnemyStun` lo aggiunge `EnemyHealth` all'avvio se manca |
 | `Win_hole` | `WinHole`, CapsuleCollider in trigger |
 | `Hole_opener`, `Hole_opener (1)` | `HoleOpener`, collegati in `WinHole.requiredOpeners` |
 | `Lava` | `KillZone` |
 | `wall`, `Plane`, `Test_World`, `Global Volume`, `Directional Light` | ambiente |
 
-`Arrow` (la freccia di mira) **non serve piu'**: il codice non la usa, va cancellata dalla
-scena se c'e' ancora. In scena `PlayerSwing.restPose` punta a `Skeletal_arm` stesso (va
-lasciato vuoto) e `followThroughAngle` e' +160 (va negativo): da far sistemare all'utente.
+`Arrow` (la freccia di mira) e' stata cancellata dalla scena il 2026-10-13.
 
 Prefab in `Assets/Prefabs/`: `Enemies/Enemy_Absorber`, `Enemies/Enemy_Explosive`
 (tag `enemy`, `maxHP` 3). `VFX/` la crea `GOOMD > Crea VFX esplosione`.
@@ -103,6 +101,10 @@ prima di toccare postura, pose o arco dello swing.
   **Dopo il tiro torna libero appena finisce la frustata**, senza aspettare la palla.
   Mette il Rigidbody in `Interpolate` in `Awake()`, per la camera incollata. Dice alla
   camera quando si mira (`CameraController.Aiming`).
+  **Il corpo passa attraverso la palla** (`ignoreBall`: `Physics.IgnoreCollision` in
+  `Start()` fra i collider del corpo e quelli della palla). Prima la spostava camminandole
+  addosso o mettendosi in postura. Voluto anche che una palla che rotola lo attraversi:
+  la si raccogliera' con E (vedi "La prossima funzionalita'").
 - `Player/PlayerSwing.cs` — **l'unico script che muove la mazza**, e ne fa due usi.
   **Swing da golf** in mira: la mazza va nella **posa di mira** (`addressPose`, davanti
   alla faccia, testa a terra: e' partenza e punto d'impatto), caricando sale lungo un
@@ -125,20 +127,41 @@ prima di toccare postura, pose o arco dello swing.
   (tasto destro sul titolo di `PlayerSwing`): `GOOMD - 1. Salva posa di riposo`, `2. Salva
   posa di mira`, `3. Rimetti la mazza a riposo`, `Crea testa della mazza`. Leggono la
   posizione attuale di `Skeletal_arm`.
-  Fuori dalla mira e' il **colpo a mano** col tasto sinistro, volutamente meno efficace
-  della palla: `damage` 1 contro i 3 HP di un nemico, portata corta (`range`, `arc`),
-  cooldown. I nemici colpiti escono dai binari (`EnemyWreck.Knock`) **prima** della spinta,
-  altrimenti da kinematic non si muoverebbero.
+  Fuori dalla mira e' il **colpo a mano** col tasto sinistro: portata corta (`range`,
+  `arc`), cooldown.
+  **La mazza non fa danno: stordisce** (deciso dall'utente il 2026-10-13, la palla deve
+  restare l'arma vera). Vale per tutto quello che la mazza colpisce senza essere la palla:
+  colpo a mano e nemici presi dallo swing. `HitTarget` chiama `EnemyStun.Stun(impulso,
+  moltiplicatore)`: lo swing al 100% o oltre stordisce piu' a lungo
+  (`perfectStunMultiplier`, `overchargeStunMultiplier`, scelti da `OnShotReleased` in base
+  alla `PowerZone`). Tolti `damage` e `knockWrecks`. **La mazza non provoca l'incidente di
+  corsia**: lo provoca solo la testa, ed e' voluto.
 - `Player/SkullAimController.cs` — FSM `Idle → Aiming → Powering → Idle`. Lo stato `Shot`
   (aspettare che la palla si fermi) **non esiste piu'**: bloccava il personaggio. Chi deve
   sapere che e' partito un tiro legge il contatore `BallHits`. Tiro da golf: la
   **direzione parte da dove guarda il personaggio** (`BeginAim(facing)`) e ruota verso
   dove guarda la camera (`aimAlignSpeed`); resta viva anche in carica (**non bloccarla**:
-  deciso dall'utente). La **rotella** sceglie l'angolo in altezza
+  deciso dall'utente).
+  **L'angolo si sceglie sempre** (in `Update`, in ogni stato tranne `Powering`): rotella
   (`minLoftAngle`..`maxLoftAngle`, normalizzato 0-1, misurato in **giri di rotella** via
-  `loftPerRevolution` / `notchesPerRevolution`); premendo il tasto sinistro l'angolo e'
-  confermato e **parte la carica**; si tira **rilasciando**, e la potenza e' proporzionale
-  a quanto si e' caricato (`chargeTime`). `CancelAim()` esce senza tirare.
+  `loftPerRevolution` / `notchesPerRevolution`) oppure **tasti numerici 1-9**, riga in alto
+  e tastierino (`loftPresets`, frazioni del ventaglio). Non si azzera entrando in mira;
+  `startLoftRatio` vale solo a inizio livello. **In carica l'angolo e' bloccato**: per
+  cambiarlo si esce dalla mira (deciso dall'utente). Premendo il tasto sinistro l'angolo e'
+  confermato e **parte la carica**; si tira **rilasciando**. `CancelAim()` esce senza
+  tirare (il destro lasciato annulla anche in carica: voluto, per i cambi improvvisi).
+  **La carica va fino al 110%**: `chargeTime` = secondi per il **100%**, `overchargeMax`
+  (0.1) = quanto oltre, allo stesso ritmo. Quattro zone, `PowerZone { Normal, Weak,
+  Perfect, Overcharge }`, `ZoneOf(carica)`:
+  debole fino a `weakTolerance` (potenza fissa `weakPower`), normale proporzionale,
+  **perfetta** a 100% ± `perfectTolerance` (`perfectMultiplier`), **oltre**
+  (`overchargeMultiplier`, la palla piu' veloce) = **palla a ricerca** se c'e' un nemico
+  nel cono (`SkullHoming`), altrimenti tiro dritto a quella potenza. E' una prova di
+  tempismo: tenendo premuto si supera il perfetto. Rinominati con `FormerlySerializedAs`
+  (i valori in scena restano): `zoneWidth`→`weakTolerance`, `bottomZonePower`→`weakPower`,
+  `bottomZoneMultiplier`→`weakMultiplier`, `topZoneMultiplier`→`perfectMultiplier`.
+  `PowerRatio` e' diventato `ChargeRatio` (1 = 100%), con `MaxChargeRatio` e
+  `CurrentZone`; `LastShotHoming` dice se l'ultimo tiro e' partito a ricerca.
   **Con angolo > 0 il teschio vola**. L'angolo e' solo "quanto in alto voglio tirare":
   **non e' un compromesso da bilanciare con un costo**, vedi lo Storico.
   **Il verso delle dipendenze e' uno solo: mouse → camera → tiro.** La camera non deve mai
@@ -151,9 +174,23 @@ prima di toccare postura, pose o arco dello swing.
   **Traiettoria a quadratini** (creati da codice, layer Ignore Raycast, niente collider),
   sempre visibile in mira: una per la palla e una per ogni nemico nella sfera (con la sua
   spinta, `PushImpulse`), oppure una dalla sfera se e' vuota. I quadratini (`maxDots`) si
-  dividono fra le traiettorie. La freccia di mira non c'e' piu'.
-  Le zone agli estremi della carica esistono ma partono **spente** (`zoneWidth` 0).
+  dividono fra le traiettorie. La freccia di mira non c'e' piu'. In carica oltre il 100%
+  con un nemico agganciato la traiettoria della palla e' la curva della ricerca.
   **Non muove la mazza**: quella e' di `PlayerSwing`.
+- `Player/SkullHoming.cs` — **la palla a ricerca**, il tiro oltre il 100%. Sulla testa
+  (se manca lo aggiunge `SkullAimController.Start`). Bersaglio: il nemico vivo piu' vicino
+  nel cono (`range`, `coneAngle`); quasi alla pari (`tieDistance`) vince il piu' allineato
+  al tiro. Mira a `aimHeight` dell'altezza del nemico (verso la testa). La curva parte
+  `arcAngle` gradi sopra la linea dritta e la **velocita' si adatta** per chiuderla sul
+  nemico: a velocita' fissa l'arco non si sceglie (ci sono solo due parabole, una quasi
+  dritta e una altissima). `arcAngle` 0 = velocita' del colpo e parabola bassa.
+  **In volo la palla e' guidata, non libera**: a ogni passo le si da' la velocita' per
+  arrivare al punto della curva, con un'accelerazione `easeIn` (parte lenta, arriva
+  velocissima: chiesto dall'utente). Toglie la gravita' che il motore aggiungera' nel
+  passo. La fine della curva viene portata sul nemico di adesso (`steering`): segue chi
+  cammina e copre il fuori portata (45 gradi). Si spegne al primo urto (dopo
+  `ignoreHitsFor`), se il bersaglio muore, o a fine curva. Gizmo di portata e cono.
+  Storia delle tre versioni nello Storico.
 - `Camera/CameraController.cs` — terza persona a un **offset fisso** (`offset`, scelto
   dall'utente), nessuno stato. Il mouse gira la camera, non il personaggio: lo yaw gira
   l'offset attorno a lui, il pitch gira **solo lo sguardo** e non sposta la camera. Quando
@@ -191,6 +228,8 @@ prima di toccare postura, pose o arco dello swing.
   rotolamento) oppure dal Rigidbody addormentato, che non riceve piu' `OnCollisionStay`.
   L'azzeramento sotto soglia vale **solo a terra**: in volo la velocita' passa per lo
   zero in cima alla parabola e il teschio si congelava a mezz'aria.
+  **Mentre `SkullHoming.IsHoming` non fa niente**: la partenza lenta della ricerca veniva
+  presa per una palla che si ferma e azzerata.
 - `Player/SkullIntegrity.cs` — HP del teschio, si consumano **per metro percorso**,
   con moltiplicatore crescente man mano che si rovina. In volo il moto orizzontale
   continua, quindi il costo passa per `airWearMultiplier` (0 = volare e' gratis):
@@ -202,7 +241,16 @@ prima di toccare postura, pose o arco dello swing.
   scansione (lo leggono ogni frame GameManager e HUD); il registro si toglie in
   tempo costante scambiando l'ultimo elemento; il flash rosso usa un
   `MaterialPropertyBlock` (niente materiale istanziato per nemico) dentro una
-  coroutine, quindi **non c'e' nessun `Update` sui nemici**.
+  coroutine, quindi **non c'e' nessun `Update` sui nemici**. In `Awake()` aggiunge
+  `EnemyStun` se manca (e c'e' un Rigidbody).
+- `Enemy/EnemyStun.cs` — **lo stordimento della mazza**: niente danno. `Stun(impulso,
+  moltiplicatore)` rende il corpo dinamico, lo spinge e lo ribalta (`tumbleSpin`): e' il
+  "ragdoll" del cubo, il punto dove accendere quello vero quando ci saranno modelli con le
+  ossa. Coroutine (niente `Update`): a terra `stunDuration` x moltiplicatore, poi aspetta
+  di andare sotto `settleSpeed` (al massimo `maxExtraWait` in piu'), si raddrizza in
+  `getUpTime` da kinematic e torna come era (`wasKinematic`). `IsDown` lo leggono
+  `EnemyPatrol` e `EnemyLaneSpawner`. Se muore o diventa rottame mentre e' giu' si
+  interrompe e resta alla fisica (`CanStun`).
 - `Enemy/EnemyWreck.cs` — al primo colpo il corpo esce dai binari e diventa un
   birillo: rotola, ingombra, spinge e **danneggia gli altri nemici urtandoli**.
   E' il pezzo che produce le carambole. Danneggia solo mentre e' libero,
@@ -219,7 +267,8 @@ prima di toccare postura, pose o arco dello swing.
   se `freezeSkullOnExplode` e' spento.
 - `Enemy/EnemyPatrol.cs` — percorso su N waypoint. Rigidbody **kinematic** mosso con
   `MovePosition` (uno dinamico spostato a mano combatte col solver); torna dinamico
-  alla morte, cosi' l'esplosione lo spedisce via.
+  alla morte, cosi' l'esplosione lo spedisce via. Stordito (`EnemyStun.IsDown`, letto in
+  `Start` e non in `Awake`) si ferma; rialzato torna sul percorso camminando.
 - `Enemy/EnemyLaneSpawner.cs` — strada a N corsie da A a B, curvabile con
   `waypoints` intermedi (spline Catmull-Rom campionata in una spezzata, misurata
   per lunghezza d'arco cosi' la velocita' resta costante nelle curve). Per corsia:
@@ -231,7 +280,9 @@ prima di toccare postura, pose o arco dello swing.
   ingorghi che si sciolgono da soli. Il traffico non rallenta per il teschio, di
   proposito. Uccidere un nemico provoca un **incidente**: gli altri della sua
   corsia escono dai binari, vengono spinti via e il traffico si ferma per
-  `crashRecovery`.
+  `crashRecovery`. Un nemico stordito dalla mazza (`Runner.stun.IsDown`) tiene il suo
+  posto in fila e chi sta dietro frena; rialzato, `Rejoin` lo riporta in corsia
+  camminando prima di riprendere la marcia (senza, `Move` lo teletrasportava).
 - `Level/GameManager.cs` — singleton. Stato `Playing/Won/Lost`, `Power`, `Damage`,
   `Kills`, `EnemiesAtStart`, `maxWrecks`, `fallY` come rete di sicurezza.
   **Due vie di vittoria indipendenti** (OR): gli obiettivi in
@@ -243,7 +294,10 @@ prima di toccare postura, pose o arco dello swing.
   Danni/Power/uccisioni, pannelli di fine livello. Solo visualizzazione: legge
   `GameManager.State` ogni frame invece di agganciarsi a `onWin`/`onLose`, cosi'
   non c'e' niente da ricollegare e gli `UnityEvent` restano liberi. Tutti i
-  riferimenti sono opzionali.
+  riferimenti sono opzionali. La barra di potenza piena vale `MaxChargeRatio` (110%), il
+  numero mostra la carica vera, il colore cambia in zona perfetta e oltre, tre strisce
+  (`weakBand`/`perfectBand`/`overchargeBand`, create da `GOOMD > Rifai barra potenza`)
+  segnano le zone. L'indicatore dell'angolo si vede **sempre**.
 - Editor (`*/Editor/`, fuori dalla build): `UI/Editor/HUDBuilder.cs` genera la
   gerarchia dell'HUD gia' cablata, `Enemy/Editor/ExplosionVFXBuilder.cs` genera un
   prefab di esplosione a particelle **mesh** (niente texture ne' trasparenze: in
@@ -304,9 +358,11 @@ I comandi completi:
 | Spazio | salta |
 | Ctrl | tuffo, a terra o in aria (la schivata) |
 | mouse | gira la camera, e la camera da' la direzione del tiro (puntatore catturato) |
-| tasto destro | **tenuto**: modalita' tiro. Lasciato: si esce |
-| tasto sinistro | colpo di mazza a mano. In modalita' tiro: tieni premuto per caricare, rilascia per tirare |
-| rotella | angolo del tiro, solo in modalita' tiro. Un giro = 25% del ventaglio |
+| tasto destro | **tenuto**: modalita' tiro. Lasciato: si esce, anche in carica |
+| tasto sinistro | colpo di mazza a mano (stordisce, niente danno). In modalita' tiro: tieni premuto per caricare (fino al 110%), rilascia per tirare |
+| rotella | angolo del tiro, sempre tranne in carica. Un giro = 25% del ventaglio |
+| 1-9 (riga in alto e tastierino) | angoli fissi del tiro (`loftPresets`) |
+| E | **da fare**: prende la testa vicina / la posa sul punto di colpo |
 
 ### La prossima funzionalita': prendere gli oggetti
 
@@ -317,9 +373,37 @@ Annunciata dall'utente il 2026-10-12 come **meccanica centrale**. Il personaggio
 - se ce l'ha in testa, **farla cadere** per poterla colpire;
 - mettere **altre cose al posto della testa**, da valutare.
 
-E' anche la risposta al vecchio punto aperto "il gioco e' recuperare la testa". I dettagli
-(tasto, cosa si puo' prendere, cosa cambia con un altro oggetto in testa) **non sono
-ancora stati detti: vanno chiesti**, non inventati.
+E' anche la risposta al vecchio punto aperto "il gioco e' recuperare la testa".
+
+**Detto dall'utente il 2026-10-13:**
+
+- il tasto e' **E**;
+- se la palla e' **vicina** (anche se rotola verso di lui), E la **raccoglie**: va "in
+  testa", sulle spalle, e lo segue;
+- E di nuovo la **posa a terra gia' sul punto di colpo** che avrebbe entrando in mira in
+  quel momento. **Non semplicemente davanti**: deve essere nella posizione che avrebbe se
+  entrasse in mira subito (cioe' l'ancoraggio di `PlayerSwing.BeginStance`);
+- fuori da questi casi la palla gli **passa attraverso** (`ignoreBall`, gia' fatto):
+  altrimenti la si sposta senza volerlo.
+
+**Domande fatte il 2026-10-13, in attesa di risposta.** Accanto a ognuna la proposta;
+l'utente deve confermare o correggere prima di scrivere il codice:
+
+1. Testa in spalla + tasto destro (mira): la posa da sola sul punto di colpo ed entra in
+   mira (proposta), oppure la mira resta bloccata finche' non la posa con E?
+2. Con la testa in spalla: cammina, corre, salta, colpo a mano normali; il **tuffo la fa
+   cadere** dove si trova (proposta). O il tuffo la tiene?
+3. La testa in spalla tocca un nemico: **non esplode e non si consuma** (proposta).
+4. Lava o caduta fuori mappa con la testa in spalla: **si perde** (proposta).
+5. Raggio di raccolta: un raggio attorno al corpo, tarabile (proposta: 1,5 m).
+6. Una palla in volo (tiro appena partito, palla a ricerca) si prende al volo con E se
+   passa nel raggio? (proposta: si').
+7. Dove sta la testa: campo `headSocket`, un oggetto vuoto sopra le spalle di
+   `Player_model` messo dall'utente; vuoto = in cima alla capsula (proposta).
+8. Il punto di colpo finisce dentro un muro: la posa davanti ai piedi (proposta).
+
+Ancora da chiedere in seguito: cosa altro si puo' prendere, cosa cambia con un altro
+oggetto al posto della testa.
 
 L'idea della **camera legata ai due pezzi** e' stata spiegata e fatta: e' la finestra
 della telecronaca (`ShotCamera`). La camera principale resta sempre sul corpo.
@@ -401,18 +485,32 @@ pubblico: e' la wiki che l'utente usa per tarare. **Non a ogni passo**: durante 
 modifiche tieni la lista di cosa trascrivere e aggiorna Taratura, Storico, `GOOMD.md` e
 questo file tutti insieme quando l'utente chiude il giro.
 
-## Dove siamo rimasti — 2026-10-12
+## Dove siamo rimasti — 2026-10-13
 
-Giornata intera a rifinire il controller, su richiesta e su prova dell'utente. Cambiati:
-camera a offset fisso (piu' vicina in mira), personaggio libero subito dopo il tiro,
-telecronaca che si apre davvero, mira a tasto destro tenuto, postura di fianco con passo
-di lato e piccoli passi, swing ad arco calcolato con follow-through e rientro, sfera di
-colpo sotto la testa della mazza, traiettoria a quadratini, barra della potenza
-verticale, salto e tuffo. Il dettaglio di ogni scelta scartata e' nello Storico.
+Il 2026-10-12 si e' rifinito il controller (camera, mira, postura, swing, traiettoria,
+salto, tuffo). Il 2026-10-13, su richiesta e su prova dell'utente:
 
-**Lo stato: compila**, confermato dall'utente durante tutta la giornata. L'ultima modifica
-(rientro della mazza sull'arco al contrario) e' stata scritta dopo l'ultima prova: va
-confermata. L'utente dice che l'arco dello swing "ha senso" e che lo tara lui.
+- **angolo sempre selezionabile**, con angoli fissi sui tasti 1-9 (riga in alto e
+  tastierino); bloccato solo in carica;
+- **la mazza stordisce invece di fare danno** (`EnemyStun`), e non provoca l'incidente;
+- **carica fino al 110%**: colpo perfetto al 100%, oltre = **palla a ricerca**
+  (`SkullHoming`), rifatta tre volte sulle prove dell'utente fino all'arco scelto e
+  all'accelerazione;
+- **il corpo passa attraverso la palla**;
+- barra della potenza con zone e colori; documenti aggiornati, con l'elenco rapido dei
+  parametri (Taratura cap. 1-bis) chiesto dall'utente.
+
+Il dettaglio di ogni scelta scartata e' nello Storico.
+
+**Lo stato.** Compila, confermato dall'utente fino alla palla a ricerca con l'arco
+(`arcAngle`), provata e approvata: "l'arco va benissimo". **L'ultima modifica non e'
+ancora stata compilata ne' provata**: la palla a ricerca guidata lungo la curva con
+`easeIn` (parte lenta, arriva veloce) e `SkullRolling` che non interviene mentre la palla
+cerca. Va confermata alla ripresa.
+
+**I campi nuovi non sono tarati**: l'utente fara' una sessione di taratura dedicata a
+tutti i parametri (compresa `Bounciness` di `Base_ground`). Lui tara anche
+`perfectTolerance`, `stanceMoveSpeed`, `stanceSnap`.
 
 **Si lavora cosi'**: l'utente manda screen in `Reference/` e descrive cosa non va. Guarda
 gli screen prima di rispondere. Quando una descrizione e' ambigua, chiedi: due volte una
@@ -421,32 +519,28 @@ lettura sbagliata dell'immagine ha fatto rifare il lavoro (la postura, lo swing)
 **I documenti si aggiornano in un colpo solo a fine giro**, non a ogni passo: chiesto
 dall'utente.
 
-### Da sistemare in editor (lo fa l'utente)
+### Alla ripresa
 
-1. `PlayerSwing.followThroughAngle` in scena e' **+160**: va negativo.
-2. `PlayerSwing.restPose` punta a `Skeletal_arm` stesso: va lasciato vuoto.
-3. L'oggetto `Arrow` in scena non serve piu': va cancellato.
-4. `Bounciness` di `Base_ground` e' ancora 0: con i tiri alti la palla atterra e si pianta.
-   Vedi `Docs/GetOutOfMyDungeon/Taratura.md` cap. 13, "Il problema nuovo: l'atterraggio".
-5. `zoneWidth` in scena e' 0,07, non 0: le zone agli estremi della carica sono accese. Da
-   chiedere se e' voluto.
+1. Chiedi l'esito della palla a ricerca con `easeIn` (compila? parte lenta e arriva
+   veloce? colpisce ancora i nemici in movimento?).
+2. Chiedi le **risposte alle 8 domande su "prendere gli oggetti"** (sezione "La prossima
+   funzionalita'"), poi progetta e scrivi.
 
-### Ancora da fare sul controller
+### In editor (lo fa l'utente, quando vuole)
 
-1. **L'angolo della mira va impostabile anche mentre non si tira.** Oggi la rotella
-   funziona solo in modalita' tiro. Chiesto dall'utente il 2026-10-12.
-2. **Il passo di lato entrando in mira sembra lento.** L'utente l'ha notato, non ha
-   chiesto di cambiarlo: i campi sono `PlayerController.stanceMoveSpeed` e `stanceSnap`.
-3. **Il colpo carico non fa piu' danno di un colpetto** sui nemici presi dallo swing:
-   usano lo stesso `damage` del colpo a mano. Da decidere.
+- `Bounciness` di `Base_ground` e' 0: con i tiri alti la palla atterra e si pianta. Rinviato
+  dall'utente alla sessione di taratura. Vedi Taratura cap. 13.
 
 Decisi e chiusi, da non riaprire: la direzione del tiro **resta viva durante la carica**;
-`swingPivot` sta **dietro il collo**; `stanceAngle` resta **90**.
+**l'angolo invece e' bloccato in carica**; `swingPivot` sta **dietro il collo**;
+`stanceAngle` resta **90**; la mazza **non fa danno**; l'incidente lo provoca **solo la
+testa**; il vecchio `zoneWidth` ora e' `weakTolerance` e lo tara l'utente.
 
 ## Prossimi passi (in ordine)
 
 1. **Prendere gli oggetti** — la nuova meccanica centrale, vedi sopra "La prossima
-   funzionalita'". Prima di progettarla chiedi i dettagli all'utente.
+   funzionalita'". Tasto e comportamento base gia' detti; mancano le risposte alle 8
+   domande.
 2. **Rilavorare la testa, i suoi stati e gli effetti** — annunciato dall'utente come uno
    dei prossimi passi. Il progetto degli stati e i suoi vincoli sono sopra ("Stati /
    potenziamenti del teschio"). E' il presupposto delle torce **e** del negozio.
@@ -473,7 +567,10 @@ Aperti minori:
 - Nessun suono, da nessuna parte.
 - `Collision Detection` e' Discrete su tutti i Rigidbody: col teschio a 20 m/s
   sono 40 cm per passo di fisica, quindi puo' attraversare un bersaglio stretto. Col volo
-  peggiora, perche' ora c'e' anche un pavimento da attraversare cadendo dall'alto.
+  peggiora, perche' ora c'e' anche un pavimento da attraversare cadendo dall'alto. Con la
+  palla a ricerca peggiora ancora: oltre il 100% la palla va a 32 m/s, e con `easeIn` 2
+  arriva sul nemico al doppio della velocita' media. Se la palla attraversa i nemici
+  invece di esplodere, il primo sospetto e' questo (`Continuous Dynamic` sulla palla).
 - La telecronaca non segue le parabole: quota fissa sopra la testa, su un tiro alto
   inquadra il cielo.
 - Nessuna animazione sul personaggio: `PlayerController.IsRunning` / `IsCrouching` /

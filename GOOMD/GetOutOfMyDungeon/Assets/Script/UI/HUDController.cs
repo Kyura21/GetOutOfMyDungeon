@@ -40,11 +40,20 @@ public class HUDController : MonoBehaviour
     // la percentuale sale insieme al riempimento, accanto alla barra. Serve una
     // barra verticale e un'etichetta ancorata in basso (come la crea il generatore)
     public bool powerLabelFollowsFill = true;
+    // La barra piena e' il massimo della carica (es. 110%), non il 100%.
+    // Nelle zone speciali il riempimento cambia colore invece di seguire il gradiente.
+    public Color perfectColor = new Color(1f, 0.85f, 0.2f);
+    public Color overchargeColor = new Color(0.7f, 0.3f, 1f);
+    // Strisce accanto alla barra che segnano le zone. Le mette il generatore;
+    // l'altezza la calcola l'HUD dalle tolleranze di SkullAimController.
+    public RectTransform weakBand;
+    public RectTransform perfectBand;
+    public RectTransform overchargeBand;
 
     [Header("Angolo di tiro")]
-    // L'angolo si sceglie con la rotella in mira. Il ventaglio col gizmo si
+    // L'angolo si sceglie con la rotella o i tasti numerici, sempre. Il ventaglio col gizmo si
     // vede solo in editor, quindi in gioco serve un numero da leggere.
-    public GameObject loftRoot;          // acceso solo mentre si mira o si carica
+    public GameObject loftRoot;          // sempre acceso: l'angolo si sceglie anche fuori dalla mira
     public TMP_Text loftLabel;
     public string loftFormat = "{0:0} gradi";
     public Slider loftBar;               // opzionale: l'angolo sul ventaglio, 0..1
@@ -161,15 +170,32 @@ public class HUDController : MonoBehaviour
 
         if (!visible) return;
 
-        float ratio = powering ? Mathf.Clamp01(aim.PowerRatio) : 0f;
+        float charge = powering ? aim.ChargeRatio : 0f;
+        float full = Mathf.Max(0.01f, aim.MaxChargeRatio);
+        float ratio = Mathf.Clamp01(charge / full);
 
         if (powerBar != null) powerBar.value = ratio;
-        if (powerFill != null && powerGradient != null)
-            powerFill.color = powerGradient.Evaluate(ratio);
+
+        if (powerFill != null)
+        {
+            SkullAimController.PowerZone zone = aim.ZoneOf(charge);
+
+            if (powering && zone == SkullAimController.PowerZone.Perfect)
+                powerFill.color = perfectColor;
+            else if (powering && zone == SkullAimController.PowerZone.Overcharge)
+                powerFill.color = overchargeColor;
+            else if (powerGradient != null)
+                powerFill.color = powerGradient.Evaluate(Mathf.Clamp01(charge));
+        }
+
+        SetBand(weakBand, 0f, aim.weakTolerance / full);
+        SetBand(perfectBand, (1f - aim.perfectTolerance) / full, (1f + aim.perfectTolerance) / full);
+        SetBand(overchargeBand, (1f + aim.perfectTolerance) / full, 1f);
 
         if (powerLabel != null)
         {
-            powerLabel.text = string.Format(powerFormat, ratio * 100f);
+            // la percentuale e' quella della carica: arriva a 110, non si ferma a 100
+            powerLabel.text = string.Format(powerFormat, charge * 100f);
 
             if (powerLabelFollowsFill)
             {
@@ -180,14 +206,27 @@ public class HUDController : MonoBehaviour
         }
     }
 
-    // L'angolo resta scritto anche durante Powering: e' stato confermato, ma
-    // il giocatore deve poter ricordare con che angolo sta per tirare.
+    // Una striscia accanto alla barra, da "from" a "to" in frazione dell'altezza.
+    // Una zona vuota sparisce.
+    static void SetBand(RectTransform band, float from, float to)
+    {
+        if (band == null) return;
+
+        bool show = to - from > 0.0001f;
+        if (band.gameObject.activeSelf != show) band.gameObject.SetActive(show);
+        if (!show) return;
+
+        band.anchorMin = new Vector2(band.anchorMin.x, Mathf.Clamp01(from));
+        band.anchorMax = new Vector2(band.anchorMax.x, Mathf.Clamp01(to));
+    }
+
+    // L'angolo si vede sempre: si sceglie anche fuori dalla mira, e senza
+    // l'indicatore lo si cambierebbe alla cieca.
     void UpdateLoft()
     {
         if (aim == null) return;
 
-        bool visible = aim.CurrentState == SkullAimController.State.Aiming
-                       || aim.CurrentState == SkullAimController.State.Powering;
+        bool visible = true;
 
         if (loftRoot != null && loftRoot.activeSelf != visible)
             loftRoot.SetActive(visible);

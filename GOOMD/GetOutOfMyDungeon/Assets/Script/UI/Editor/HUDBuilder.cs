@@ -224,12 +224,29 @@ public static class HUDBuilder
         vr.anchoredPosition = new Vector2(-14f, 0f);
         vr.sizeDelta = new Vector2(120f, 40f);
 
+        // a destra della barra, le strisce delle zone: debole in basso, perfetto
+        // attorno al 100%, oltre il massimo in cima. L'altezza la decide l'HUD
+        hud.weakBand = NewBand("WeakBand", group, Bad);
+        hud.perfectBand = NewBand("PerfectBand", group, hud.perfectColor);
+        hud.overchargeBand = NewBand("OverchargeBand", group, hud.overchargeColor);
+
         group.gameObject.SetActive(false);
 
         hud.powerRoot = group.gameObject;
         hud.powerBar = bar;
         hud.powerFill = fill;
         hud.powerLabel = value;
+    }
+
+    static RectTransform NewBand(string name, Transform parent, Color color)
+    {
+        RectTransform rt = NewImage(name, parent, color).rectTransform;
+        rt.anchorMin = new Vector2(1f, 0f);
+        rt.anchorMax = new Vector2(1f, 0f);
+        rt.pivot = new Vector2(0f, 0.5f);
+        rt.anchoredPosition = new Vector2(6f, 0f);
+        rt.sizeDelta = new Vector2(10f, 0f);
+        return rt;
     }
 
     // L'angolo di tiro, scelto con la rotella. Sta sopra la barra di potenza

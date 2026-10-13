@@ -39,6 +39,7 @@ public class EnemyPatrol : MonoBehaviour
 
     private Rigidbody rb;
     private EnemyHealth health;
+    private EnemyStun stun;
     private int index;
     private int direction = 1;
     private float waitTimer;
@@ -68,6 +69,9 @@ public class EnemyPatrol : MonoBehaviour
 
     void Start()
     {
+        // in Start e non in Awake: EnemyStun puo' averlo aggiunto EnemyHealth.Awake
+        stun = GetComponent<EnemyStun>();
+
         if (!HasPath) return;
 
         // un waypoint figlio del nemico si muoverebbe insieme a lui e il
@@ -86,6 +90,10 @@ public class EnemyPatrol : MonoBehaviour
     void FixedUpdate()
     {
         if (released || finished || !HasPath) return;
+
+        // stordito dalla mazza: a terra lo muove la fisica. Rialzato, riparte da
+        // dove e' e torna sul percorso camminando
+        if (stun != null && stun.IsDown) return;
 
         if (waitTimer > 0f)
         {

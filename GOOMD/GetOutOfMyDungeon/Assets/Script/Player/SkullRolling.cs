@@ -49,6 +49,7 @@ public class SkullRolling : MonoBehaviour
     public Vector3 LastVelocity => lastVelocity;
 
     private Rigidbody rb;
+    private SkullHoming homing;
     private Vector3 lastVelocity;
     private float lastGroundTime;
 
@@ -68,6 +69,16 @@ public class SkullRolling : MonoBehaviour
         // fisica. Scrivergli la velocita' non farebbe niente e Unity avvisa
         // a ogni frame.
         if (rb.isKinematic) return;
+
+        // palla a ricerca: la guida SkullHoming. La sua partenza e' lenta, e qui
+        // verrebbe presa per una palla che si sta fermando e azzerata.
+        // Lo cerco qui e non in Awake: puo' averlo aggiunto SkullAimController.Start
+        if (homing == null) TryGetComponent(out homing);
+        if (homing != null && homing.IsHoming)
+        {
+            lastVelocity = rb.linearVelocity;
+            return;
+        }
 
         Vector3 v = rb.linearVelocity;
         bool grounded = IsGrounded;

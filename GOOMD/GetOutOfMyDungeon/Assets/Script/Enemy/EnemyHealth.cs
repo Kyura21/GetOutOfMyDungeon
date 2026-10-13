@@ -63,6 +63,12 @@ public class EnemyHealth : MonoBehaviour
     {
         CurrentHP = maxHP;
 
+        // ogni nemico si puo' stordire con la mazza. Se il prefab non ha EnemyStun
+        // lo aggiungo coi valori di default: basta metterlo sul prefab per tararlo.
+        // Qui in Awake, cosi' EnemyPatrol e lo spawner lo trovano gia'.
+        if (GetComponent<EnemyStun>() == null && GetComponent<Rigidbody>() != null)
+            gameObject.AddComponent<EnemyStun>();
+
         renderers = GetComponentsInChildren<Renderer>();
         baseColors = new Color[renderers.Length];
         block = new MaterialPropertyBlock();

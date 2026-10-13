@@ -21,7 +21,9 @@ dove stanno, cosa fanno, cosa succede se li muovi.
 > **non** cambia gli oggetti già in scena.
 > Le colonne "in scena" qui sotto riportano i valori attualmente salvati in
 > `Assets/Scenes/SampleScene.unity` alla data di stesura (2026-09-08). I capitoli 2, 2-bis
-> e 2-ter sono stati riletti sulla scena salvata il **2026-10-12**.
+> e 2-ter sono stati riletti sulla scena salvata il **2026-10-12**. I campi nuovi del
+> **2026-10-13** (carica al 110%, palla a ricerca, stordimento) hanno solo il default:
+> l'utente li tarerà in una sessione dedicata.
 
 Legenda delle colonne:
 
@@ -42,16 +44,335 @@ Legenda delle colonne:
 | `Mazza a mira` (figlio di `Player`) | la posa di mira della mazza (`PlayerSwing.addressPose`). Renderer spento, nessun collider |
 | `Main Camera` | `CameraController` — terza persona a offset fisso, si avvicina in mira |
 | `Shot_Camera_Rig` (**generato**) | `ShotCamera` — la finestra con la telecronaca del tiro |
-| `Skull_player` | `SkullExplosion`, `SkullRolling`, `SkullIntegrity`, Rigidbody, SphereCollider (+ physic material) |
-| `Enemy`, `Enemy (1)`, `Enemy (2)` | `EnemyHealth` — HP, ricompense, punteggio danni |
+| `Skull_player` | `SkullExplosion`, `SkullRolling`, `SkullIntegrity`, `SkullHoming` (la palla a ricerca), Rigidbody, SphereCollider (+ physic material) |
+| `Enemy`, `Enemy (1)`, `Enemy (2)` | `EnemyHealth` — HP, ricompense, punteggio danni; `EnemyStun` — lo stordimento della mazza (se manca lo aggiunge `EnemyHealth` all'avvio) |
 | `Win_hole` | `WinHole` — buca di vittoria |
 | `Hole_opener`, `Hole_opener (1)` | `HoleOpener` — bersagli che aprono la buca |
 | `Game_Manager` | `GameManager` — obiettivi del livello, sconfitta, punteggi |
 | `Lava` | `KillZone` — morte istantanea |
 | `HUD` (Canvas) | `HUDController` — barre, contatori, pannelli di fine livello |
 
-> La freccia di mira (`Arrow`) **non c'è più** (2026-10-12): l'oggetto in scena va
-> cancellato a mano. La direzione si legge dai quadratini della traiettoria.
+> La freccia di mira (`Arrow`) **non c'è più**: cancellata dalla scena il 2026-10-13.
+> La direzione si legge dai quadratini della traiettoria.
+
+---
+
+## 1-bis. Elenco rapido: ogni parametro in poche parole
+
+Una riga per campo, per script. Serve per tarare senza leggere tutto. Il dettaglio, i
+legami fra i valori e i conti stanno nei capitoli dopo. I campi di riferimento (gli
+oggetti da collegare) e gli eventi non ci sono: non si tarano.
+
+### `SkullAimController` (su `Game_Controller`) — il tiro
+
+| Campo | Cosa tara |
+|---|---|
+| `aimAlignSpeed` | quanto in fretta la mira passa da dove guarda il corpo a dove guarda la camera |
+| `minLoftAngle` | l'angolo più basso, in gradi |
+| `maxLoftAngle` | l'angolo più alto, in gradi |
+| `startLoftRatio` | l'angolo a inizio livello |
+| `loftPresets` | gli angoli dei tasti numerici 1-9, in frazione del ventaglio |
+| `loftPerRevolution` | quanto cambia l'angolo in un giro di rotella |
+| `notchesPerRevolution` | gli scatti della tua rotella in un giro |
+| `loftSmooth` | quanto morbido si muove l'angolo |
+| `showAimGizmo` | il gizmo del ventaglio |
+| `maxPower` | la velocità della palla al 100% |
+| `chargeTime` | i secondi per caricare al 100% |
+| `overchargeMax` | quanto si può caricare oltre il 100% |
+| `forceMultiplier` | moltiplica tutti i tiri |
+| `weakTolerance` | fin dove la carica è un colpo debole |
+| `weakPower` | la potenza del colpo debole |
+| `weakMultiplier` | moltiplica il colpo debole |
+| `perfectTolerance` | quanto è larga la zona del colpo perfetto attorno al 100% |
+| `perfectMultiplier` | il boost di potenza del colpo perfetto |
+| `overchargeMultiplier` | la potenza oltre il 100%: la palla più veloce |
+| `showTrajectory` | i quadratini della traiettoria |
+| `dotPrefab` / `dotMaterial` | l'aspetto dei quadratini |
+| `dotSpacing` | la distanza fra i quadratini |
+| `dotSize` | la grandezza dei quadratini |
+| `maxDots` | quanti quadratini in tutto |
+| `trajectorySteps` / `trajectoryStep` | quanto lunga è la traiettoria disegnata |
+| `trajectoryMask` | cosa ferma la traiettoria disegnata |
+
+### `SkullHoming` (su `Skull_player`) — la palla a ricerca
+
+| Campo | Cosa tara |
+|---|---|
+| `range` | fin dove cerca un nemico |
+| `coneAngle` | quanto è largo il cono di ricerca |
+| `tieDistance` | sotto questa differenza di distanza vince il nemico più allineato |
+| `aimHeight` | dove mira sul nemico: piedi o testa |
+| `arcAngle` | quanto arco fa la palla |
+| `easeIn` | quanto accelera: partenza lenta, arrivo veloce |
+| `steering` | quanto segue il nemico che si sposta |
+| `ignoreHitsFor` | per quanto, alla partenza, un urto non ferma la ricerca |
+| `showGizmo` | il gizmo del cono |
+
+### `PlayerController` (su `Player`) — il corpo
+
+| Campo | Cosa tara |
+|---|---|
+| `ignoreBall` | il corpo passa attraverso la palla |
+| `walkSpeed` | la velocità camminando |
+| `runSpeed` | la velocità correndo |
+| `crouchSpeed` | la velocità abbassato |
+| `acceleration` | quanto in fretta parte e si ferma |
+| `turnSpeed` | quanto in fretta si gira |
+| `airControl` | quanto si sterza in aria |
+| `crouchHeightScale` | quanto si abbassa |
+| `crouchChangeSpeed` | quanto in fretta si abbassa |
+| `stanceAngle` | di quanto il corpo è girato rispetto al tiro, in mira |
+| `stanceMoveSpeed` | la velocità del passo di lato entrando in mira |
+| `stanceSnap` | quanto è secco il passo di lato |
+| `aimStepSpeed` | la velocità dei piccoli passi in mira |
+| `jumpHeight` | l'altezza del salto |
+| `groundMask` | cosa conta come terreno |
+| `groundCheckDistance` | quanto sotto i piedi cerca il terreno |
+| `maxGroundAngle` | oltre questa pendenza è un muro |
+| `diveSpeed` | la velocità del tuffo |
+| `diveUpSpeed` | quanto sale il tuffo |
+| `diveTilt` | quanto si inclina nel tuffo |
+| `tiltSpeed` | quanto in fretta si inclina |
+| `getUpTime` | quanto dura il rialzarsi dopo il tuffo |
+| `getUpSpeed` | la velocità mentre si rialza |
+
+### `PlayerSwing` (su `Player`) — la mazza
+
+| Campo | Cosa tara |
+|---|---|
+| `restPose` / `addressPose` | le pose della mazza: a riposo e in mira |
+| `addressBlendSpeed` | quanto in fretta la mazza va in posa di mira |
+| `swingPivot` | il punto attorno a cui gira lo swing |
+| `backswingAngle` | quanto sale la mazza caricando |
+| `followThroughAngle` | quanto sale la mazza dopo il colpo |
+| `invertSwingSide` | carica a sinistra invece che a destra |
+| `topRadius` | quanto si stringe l'arco salendo |
+| `swingDuration` | quanto dura la frustata |
+| `impactAt` | in che punto della frustata avviene il colpo |
+| `recoverTime` | quanto dura il rientro della mazza |
+| `returnSpeed` | quanto in fretta torna a riposo |
+| `strikeReach` | quanto davanti al corpo sta il punto di colpo |
+| `stanceDistance` | il punto di colpo se manca `clubHead` |
+| `strikeRadius` | quanto è grande la sfera di colpo |
+| `groundMask` | dove si appoggia il punto di colpo |
+| `meleeAxis` | l'asse del colpo a mano |
+| `range` / `arc` | la portata e la larghezza del colpo a mano |
+| `cooldown` | la pausa fra due colpi |
+| `meleeDuration` | quanto dura il colpo a mano |
+| `hitAt` | in che punto del colpo a mano si prende il bersaglio |
+| `meleeFrom` / `meleeTo` | da dove a dove gira la mazza nel colpo a mano |
+| `knockForce` | quanto lontano vola il nemico colpito |
+| `knockLift` | quanto in alto vola il nemico colpito |
+| `perfectStunMultiplier` | lo stordimento in più con lo swing al 100% |
+| `overchargeStunMultiplier` | lo stordimento in più con lo swing oltre il 100% |
+| `hitMask` | cosa può colpire la mazza |
+| `maxTargetsPerSwing` | quanti oggetti al massimo in un colpo |
+
+### `CameraController` (su `Main Camera`)
+
+| Campo | Cosa tara |
+|---|---|
+| `offset` | dove sta la camera rispetto al personaggio |
+| `positionSmooth` | quanto la camera insegue in ritardo |
+| `aimOffset` | dove sta la camera in mira |
+| `aimBlendTime` | quanto dura il passaggio alla camera di mira |
+| `lookSensitivity` | la sensibilità del mouse |
+| `lookMinPitch` / `lookMaxPitch` | quanto si guarda in alto e in basso |
+| `lockCursor` | cattura il puntatore |
+| `collisionMask` | cosa avvicina la camera quando è in mezzo |
+| `collisionPadding` | quanto la camera resta staccata dal muro |
+| `minDistance` | quanto può avvicinarsi al personaggio |
+
+### `ShotCamera` (su `Shot_Camera_Rig`) — la telecronaca
+
+| Campo | Cosa tara |
+|---|---|
+| `followDistance` | quanto la camera sta dietro la testa |
+| `followHeight` | quanto la camera sta in alto |
+| `followLookHeight` | quanto sopra la testa guarda |
+| `followSmooth` | quanto morbido insegue |
+| `hideDistance` | da che distanza la finestra si può chiudere |
+| `textureWidth` / `textureHeight` | la risoluzione della finestra |
+
+### `SkullRolling` (su `Skull_player`) — il rotolamento
+
+| Campo | Cosa tara |
+|---|---|
+| `rollingDamping` | quanto frena a terra |
+| `stopThreshold` | sotto questa velocità si ferma |
+| `airDamping` | quanto frena in aria |
+| `groundNormalMin` | quanto in piano deve essere una superficie per contare come terreno |
+| `groundGrace` | per quanto resta "a terra" dopo l'ultimo contatto |
+| `collisionSpeedLoss` | quanta velocità perde in un urto |
+| `minImpactSpeed` | sotto questa velocità l'urto non conta |
+
+### `SkullIntegrity` (su `Skull_player`) — la vita della testa
+
+| Campo | Cosa tara |
+|---|---|
+| `maxIntegrity` | la vita della testa |
+| `wearPerMeter` | quanta vita costa un metro rotolato |
+| `fragility` | quanto consuma di più a fine vita |
+| `airWearMultiplier` | quanto costa un metro in volo |
+| `wearPerImpact` | quanta vita costa un urto |
+| `minImpactSpeed` | sotto questa velocità l'urto non costa |
+
+### `SkullExplosion` (su `Skull_player`) — l'esplosione
+
+| Campo | Cosa tara |
+|---|---|
+| `explosionVFX` / `destroyDelay` | l'effetto e quanto resta |
+| `explosionForce` | quanto forte spinge |
+| `explosionRadius` | quanto è grande |
+| `upwardsModifier` | quanto spinge in alto |
+| `affectedLayers` | cosa viene investito |
+| `explosionDamage` | il danno ai nemici |
+| `damageFalloff` | il danno cala con la distanza |
+| `freezeSkullOnExplode` | la testa si ferma quando esplode |
+| `hideSkullOnExplode` | la testa sparisce quando esplode |
+
+### `EnemyHealth` (sui nemici)
+
+| Campo | Cosa tara |
+|---|---|
+| `maxHP` | la vita del nemico |
+| `powerReward` | quanto Power dà da morto |
+| `damageScorePerHP` | i punti Danni per ogni HP tolto |
+| `damageScoreOnKill` | i punti Danni in più alla morte |
+| `deathBehaviour` | cosa succede al corpo da morto |
+| `deathVFX` / `deathDelay` | l'effetto di morte e quando sparisce |
+| `flashOnHit` / `flashColor` / `flashDuration` | il lampo quando viene colpito |
+
+### `EnemyStun` (sui nemici) — lo stordimento della mazza
+
+| Campo | Cosa tara |
+|---|---|
+| `stunDuration` | quanto resta a terra |
+| `settleSpeed` | si rialza solo sotto questa velocità |
+| `maxExtraWait` | il tempo massimo in più ad aspettare che si fermi |
+| `tumbleSpin` | quanto si ribalta quando cade |
+| `getUpTime` | quanto dura il rialzarsi |
+
+### `EnemyWreck` (sui nemici) — il corpo come birillo
+
+| Campo | Cosa tara |
+|---|---|
+| `knockOnDamage` | esce dai binari al primo danno |
+| `knockOnDeath` | esce dai binari da morto |
+| `impactDamage` | il danno che fa urtando altri nemici |
+| `minImpactSpeed` | sotto questa velocità l'urto non fa danno |
+| `impactCooldown` | la pausa fra due danni da urto |
+| `impactScore` | i punti Danni per ogni urto |
+| `lifetime` | quanto resta in scena |
+
+### `EnemyArmor` — corazzato
+
+| Campo | Cosa tara |
+|---|---|
+| `directional` | la corazza ha un lato |
+| `armorFacing` | dove guarda la corazza |
+| `armorHalfAngle` | quanto è larga la corazza |
+| `minBreakSpeed` | la velocità minima per passare |
+| `bounceKeep` | quanta velocità tiene la testa che rimbalza |
+| `minBounceSpeed` | sotto questa velocità non rilancia |
+| `blocksSplash` | para anche le esplosioni |
+
+### `EnemyExplosive` — esplosivo
+
+| Campo | Cosa tara |
+|---|---|
+| `radius` | quanto è grande l'esplosione |
+| `damage` | il danno ai vicini |
+| `force` / `upwardsModifier` | quanto e quanto in alto spinge |
+| `affectedLayers` | cosa viene investito |
+| `damageScore` | i punti Danni per l'esplosione |
+| `explosionVFX` / `destroyDelay` | l'effetto e quanto resta |
+
+### `EnemyAbsorber` — gelatinoso
+
+| Campo | Cosa tara |
+|---|---|
+| `speedKeep` | quanta velocità tiene la testa |
+| `minImpactSpeed` | sotto questa velocità non assorbe |
+| `absorbAngular` | frena anche la rotazione |
+
+### `EnemyPatrol` — pattuglia
+
+| Campo | Cosa tara |
+|---|---|
+| `waypoints` / `mode` | il percorso e come lo ripete |
+| `snapToFirstWaypoint` | parte sul primo punto |
+| `speed` | la velocità |
+| `waitAtWaypoint` | la pausa a ogni punto |
+| `arriveThreshold` | quanto vicino conta come arrivato |
+| `faceMovement` / `turnSpeed` | si gira verso dove va, e quanto in fretta |
+| `stunOnHit` | la pausa quando incassa un danno |
+
+### `EnemyLaneSpawner` — la strada a corsie
+
+| Campo | Cosa tara |
+|---|---|
+| `pointA` / `waypoints` / `pointB` | il percorso della strada |
+| `smoothPath` / `samplesPerSegment` | quanto è curva e liscia |
+| `laneSpacing` / `centerLanes` | la distanza fra le corsie |
+| `enemyPool` | i tipi di nemico e il loro peso |
+| `faceTravelDirection` | i nemici guardano dove vanno |
+| `respawnDelay` | l'attesa dopo un'uccisione |
+| `startPopulated` | la strada parte piena |
+| `totalSpawnBudget` | quanti nemici in tutto |
+| `stopLaneOnCrash` / `crashOnHit` | l'incidente quando la testa colpisce |
+| `crashImpulse` / `crashRadius` / `crashUpwards` | quanto forte l'incidente spinge |
+| `crashDamage` | il danno dell'incidente |
+| `crashRecovery` | quanto resta ferma la corsia |
+| Per corsia: `enemyCount` | quanti nemici insieme |
+| Per corsia: `direction` | il verso di marcia |
+| Per corsia: `spawnInterval` / `intervalVariation` | la cadenza e quanto è irregolare |
+| Per corsia: `speed` / `speedVariation` | la velocità e quanto varia |
+| Per corsia: `minGap` / `slowdownGap` | la distanza di sicurezza |
+| Per corsia: `spawnBudget` | quanti nemici in tutto sulla corsia |
+| Per corsia: `phase` | lo sfasamento rispetto alle altre |
+| Per corsia: `poolOverride` | i tipi di nemico solo di questa corsia |
+
+### `GameManager` (su `Game_Manager`) — il livello
+
+| Campo | Cosa tara |
+|---|---|
+| `requireAllEnemiesDead` | per vincere vanno uccisi tutti |
+| `requiredKills` | quante uccisioni servono |
+| `requiredDamage` | quanti punti Danni servono |
+| `requiredPuzzles` | quali puzzle servono |
+| `countDamageAfterWin` | i Danni contano anche a livello finito |
+| `fallY` | sotto questa quota si perde |
+| `maxWrecks` | quanti rottami al massimo insieme |
+
+### Livello: buca, apri-buca, lava, puzzle
+
+| Script | Campo | Cosa tara |
+|---|---|---|
+| `WinHole` | `requiredOpeners` / `requireAllOpeners` | cosa apre la buca |
+| `WinHole` | `snapToCenter` / `freezeSkull` / `hideSkull` | cosa fa la testa imbucata |
+| `HoleOpener` | `onlySkull` | lo apre solo la testa |
+| `HoleOpener` | `minImpactSpeed` | la velocità minima per aprirlo |
+| `HoleOpener` | `triggeredVFX` / `disableOnTriggered` | cosa fa quando si apre |
+| `KillZone` | `reason` | il testo della sconfitta |
+| `PuzzleTrigger` | `puzzleName` / `powerReward` | il nome e la ricompensa |
+
+### `HUDController` (su `HUD`)
+
+| Campo | Cosa tara |
+|---|---|
+| `integrityGradient` / `integrityFormat` | il colore e il testo della barra della vita |
+| `integritySmooth` | quanto morbida scende la barra della vita |
+| `lowIntegrityThreshold` / `lowIntegrityPulseSpeed` | quando e quanto lampeggia la vita bassa |
+| `powerGradient` | il colore della barra di potenza |
+| `showWhileAiming` | la barra di potenza si vede già in mira |
+| `powerFormat` / `powerLabelFollowsFill` | il testo della potenza e se sale con la barra |
+| `perfectColor` / `overchargeColor` | il colore della barra al 100% e oltre |
+| `loftFormat` | il testo dell'angolo |
+| `damageFormat` / `damageRollSpeed` | il testo dei Danni e quanto in fretta sale |
+| `powerCurrencyFormat` | il testo del Power |
+| `enemiesFormat` | il testo dei nemici rimasti |
+| `statsFormat` | il testo di fine livello |
 
 ---
 
@@ -72,12 +393,17 @@ Sequenza di input:
    (cap. 2-bis). Si entra **sempre**, anche con la palla lontana o in movimento.
 2. in `Aiming`: la direzione del tiro **parte da dove guarda il personaggio** e ruota verso
    dove guarda la camera, a `aimAlignSpeed` gradi al secondo. Il **mouse** gira la camera.
-   La **rotella** alza e abbassa l'angolo. **WASD** fa piccoli passi per allineare la
-   mazza alla palla.
-3. **premi il tasto sinistro**: l'angolo è confermato e la potenza inizia a caricarsi.
-   Più tieni premuto, più carichi. I piccoli passi funzionano anche qui.
-4. **rilascia il sinistro** per tirare. La potenza è proporzionale a quanto hai caricato.
-5. **lascia il destro** in qualsiasi momento per annullare e tornare a camminare.
+   **WASD** fa piccoli passi per allineare la mazza alla palla.
+3. **premi il tasto sinistro**: l'angolo è confermato e la carica parte. Arriva al 100% in
+   `chargeTime` secondi e continua fino al 110%. I piccoli passi funzionano anche qui.
+   **L'angolo in carica è bloccato**: per cambiarlo si esce dalla mira.
+4. **rilascia il sinistro** per tirare. Cosa succede dipende dalla zona in cui hai
+   rilasciato (vedi "Zone della carica").
+5. **lascia il destro** in qualsiasi momento, anche in carica, per annullare e tornare a
+   camminare. Serve per i cambi improvvisi durante il gioco.
+
+**L'angolo si sceglie sempre**, anche camminando: con la rotella o con i tasti numerici
+(riga in alto o tastierino). Si arriva in mira con l'angolo già pronto.
 
 Se dopo il tiro il destro è ancora premuto, finita la frustata si rientra in mira da soli.
 
@@ -99,6 +425,7 @@ Se dopo il tiro il destro è ancora premuto, finita la frustata si rientra in mi
 | `cameraTransform` | `Main Camera` | da qui arriva la direzione del tiro. Se lo lasci vuoto prende `Camera.main` |
 | `swing` | `Player` | il `PlayerSwing`, che sa dove colpisce la mazza. Se vuoto lo cerca in scena. **Se non lo trova, il colpo prende la testa da qualunque distanza** |
 | `skullExplosion` | vuoto | se vuoto lo pesca da `ball` in `Start()` — va bene lasciarlo così |
+| `homing` | vuoto | la palla a ricerca. Se vuoto lo pesca da `ball`, e se `ball` non ce l'ha lo aggiunge con i default |
 
 ### Direzione
 
@@ -106,10 +433,13 @@ Se dopo il tiro il destro è ancora premuto, finita la frustata si rientra in mi
 |---|---|---|
 | `aimAlignSpeed` | 360 | Gradi al secondo con cui la direzione del tiro passa da dove guarda il personaggio a dove guarda la camera. `0` = salta subito sulla camera. |
 
-### Angolo di tiro (rotella)
+### Angolo di tiro (rotella e tasti numerici)
 
 L'angolo è semplicemente **quanto in alto vuoi tirare la palla**. A zero la palla scorre
 raso terra. Al massimo fa un campanile. A metà parte tesa verso un punto davanti a te.
+
+Si sceglie **in ogni momento tranne durante la carica**: camminando, fermo, in mira. Non
+torna a zero entrando in mira: resta dove l'hai lasciato.
 
 Dentro lo script l'angolo è un numero da 0 a 1, mappato sul ventaglio
 `minLoftAngle → maxLoftAngle`. Così la corsa della rotella resta la stessa anche se
@@ -119,14 +449,14 @@ cambi gli estremi.
 |---|---|---|
 | `minLoftAngle` | 0 | Estremo basso del ventaglio, in gradi. A 0 il tiro è raso. |
 | `maxLoftAngle` | 55 | Estremo alto, in gradi. **Clampato a 89** da `OnValidate`: a 90 la direzione di lancio diventa parallela a `Vector3.up`. |
-| `startLoftRatio` | 0 | Angolo con cui si entra in mira. A 0 ogni tiro riparte raso: l'angolo **non** si ricorda da un tiro all'altro. |
+| `startLoftRatio` | 0 | Angolo a inizio livello, in frazione del ventaglio. Da lì in poi l'angolo resta quello che sceglie il giocatore. |
+| `loftPresets` | 0 / 0.25 / 0.45 / 0.7 / 1 | Gli angoli fissi dei tasti numerici: il primo valore va sul tasto 1, il secondo sul 2, fino al 9. Valgono sia la riga in alto sia il tastierino. Sono **frazioni del ventaglio**, non gradi: con `maxLoftAngle` 55, 0.45 = circa 25°. Più valori = più tasti attivi. |
 | `loftPerRevolution` | 0.25 | Quanto cambia l'angolo in **un giro completo di rotella**, in frazione del ventaglio. Con 0.25 servono quattro giri per andare da un estremo all'altro. |
 | `notchesPerRevolution` | 24 | Quanti scatti ha la tua rotella in un giro. 24 è il valore dei mouse più comuni. Se l'angolo si muove troppo o troppo poco, **questo è il numero da correggere**. |
 | `loftSmooth` | 14 | Morbidezza con cui l'angolo mostrato raggiunge quello scelto. `0` = salta di scatto. |
 | `showAimGizmo` | true | Accende il gizmo del ventaglio. |
 
-> **Da fare.** L'angolo oggi si sceglie **solo in mira**. L'utente vuole poterlo impostare
-> anche mentre non tira, camminando.
+L'indicatore dell'angolo nell'HUD si vede sempre: senza, lo si cambierebbe alla cieca.
 
 > **Perché c'era un problema.** La prima versione contava gli scatti dividendo il valore
 > dello scroll per 120, che è quanto manda Windows per uno scatto. Ma l'Input System non
@@ -152,9 +482,13 @@ Il gizmo disegna tre cose:
 
 | Campo | Default | In scena | Cosa fa |
 |---|---|---|---|
-| `maxPower` | 20 | 20 | Potenza a carica piena. Con `forceMultiplier = 1` e Rigidbody di massa 1, questo è **direttamente la velocità iniziale in m/s** della palla (impulso su massa 1 = variazione di velocità). È il numero più importante del gioco: decide quanto lontano arriva un colpo. |
-| `chargeTime` | 1.2 | — | Quanti secondi di pressione servono per arrivare al massimo. Oltre, la carica resta ferma al massimo. Corto = colpi forti facili; lungo = devi aspettare, e aspettare in mezzo ai nemici costa. **È la leva di ritmo del tiro.** |
-| `forceMultiplier` | 1 | 1 | Moltiplicatore finale sull'impulso. Comodo per scalare tutto il gioco senza toccare `maxPower`, che serve anche a disegnare la barra della UI. |
+| `maxPower` | 20 | 20 | Potenza al **100%** della carica. Con `forceMultiplier = 1` e Rigidbody di massa 1, questo è **direttamente la velocità iniziale in m/s** della palla (impulso su massa 1 = variazione di velocità). È il numero più importante del gioco: decide quanto lontano arriva un colpo. |
+| `chargeTime` | 1.2 | 1.2 | Quanti secondi di pressione servono per arrivare al **100%**. Corto = colpi forti facili e zona perfetta più stretta nel tempo; lungo = devi aspettare, e aspettare in mezzo ai nemici costa. **È la leva di ritmo del tiro.** |
+| `overchargeMax` | 0.1 | — | Quanto si carica oltre il 100%. 0.1 = fino al 110%, raggiunto in `chargeTime × 1.1` secondi. Lì la carica si ferma. |
+| `forceMultiplier` | 1 | 1 | Moltiplicatore finale sull'impulso. Comodo per scalare tutto il gioco senza toccare `maxPower`. |
+
+La carica sale sempre allo stesso ritmo, anche oltre il 100%. Il colpo migliore è al
+100%, non al massimo: tenendo premuto si supera il perfetto. **È una prova di tempismo.**
 
 Quando il colpo parte, la velocità che la palla aveva viene **azzerata** prima
 dell'impulso. Sommare l'impulso a una palla che si muoveva ancora darebbe tiri
@@ -169,36 +503,44 @@ preso se il suo collider tocca la sfera, non se il suo centro ci cade dentro.
 Tutto quello che tocca la sfera viene colpito **insieme**:
 
 - **la palla** parte, con l'angolo e la potenza che hai scelto;
-- **i nemici** vengono fatti uscire dai binari, spinti lungo la direzione del tiro
-  (`PlayerSwing.PushImpulse`) e danneggiati (`PlayerSwing.damage`);
+- **i nemici** vengono **storditi**, non danneggiati: cadono, volano lungo la direzione del
+  tiro (`PlayerSwing.PushImpulse`) e poi si rialzano (`EnemyStun`, cap. 7). Al 100% e oltre
+  restano giù più a lungo (`PlayerSwing.perfectStunMultiplier`, `overchargeStunMultiplier`);
 - **se la sfera è vuota**, la mazza mulina a vuoto. Lo swing si vede comunque.
+
+La mazza non provoca mai l'incidente di corsia: quello lo provoca solo la testa.
 
 `BallInReach` dice se la palla tocca la sfera adesso. `LastShotHitBall` dice com'è andato
 l'ultimo colpo. Lo legge `ShotCamera` (cap. 3-bis): un colpo a vuoto non apre la
 telecronaca.
 
-> **Aperto.** Il colpo sui nemici usa lo stesso `damage` del colpo a mano, quindi caricare
-> a fondo non fa più danno di un colpetto. Va deciso quando ci saranno gli oggetti di
-> scena colpibili.
+### Zone della carica
 
-### Zone agli estremi della carica
+La carica (da 0 a 110%) è divisa in quattro zone. La zona in cui rilasci decide il colpo.
 
-| Campo | Default | Cosa fa |
-|---|---|---|
-| `zoneWidth` | 0 | Quanto è larga la zona premiata, su ciascuno dei due estremi della carica. **Parte da 0, cioè spenta.** In scena era 0,07 al 2026-10-12. |
-| `topZoneMultiplier` | 1.3 | Quanto viene moltiplicata la forza a carica piena. |
-| `bottomZoneMultiplier` | 1 | Lo stesso, a carica quasi nulla. |
-| `bottomZonePower` | 0.12 | La forza assegnata alla zona bassa, in frazione di `maxPower`. Serve perché a carica zero la forza è zero, e qualunque numero moltiplicato per zero resta zero: senza questo campo il tiro non partirebbe. |
+| Zona | Dove | La palla | Un nemico nella sfera |
+|---|---|---|---|
+| **Debole** | da 0 a `weakTolerance` | potenza fissa: `maxPower × weakPower × weakMultiplier` | stordito normale |
+| **Normale** | in mezzo | potenza proporzionale alla carica | stordito normale |
+| **Perfetta** | 100% ± `perfectTolerance` | `maxPower × perfectMultiplier` | stordito più a lungo |
+| **Oltre** | sopra la perfetta, fino al 110% | `maxPower × overchargeMultiplier`, e **cerca il nemico** (cap. 2-quater) | stordito più a lungo |
 
-> **Perché partono spente.** Queste zone erano nate quando la potenza si dava fermando una
-> barra che oscillava: beccare l'estremo era difficile, quindi premiarlo aveva senso. Con
-> la carica a pressione il massimo lo raggiunge chiunque aspetti, quindi
-> `topZoneMultiplier` non sarebbe un premio al tempismo ma solo un 30% di potenza in più
-> regalato. Se lo accendi, sappi che stai alzando `maxPower` travestito.
+| Campo | Default | In scena | Cosa fa |
+|---|---|---|---|
+| `weakTolerance` | 0.07 | 0.07 | Fin dove la carica è un colpo debole. 0 = zona spenta. Era `zoneWidth`: il valore è passato da solo. |
+| `weakPower` | 0.12 | 0.12 | La potenza del colpo debole, in frazione di `maxPower`. Serve perché a carica quasi zero la forza sarebbe quasi zero e il tiro non partirebbe. Era `bottomZonePower`. |
+| `weakMultiplier` | 1 | 1 | Moltiplica il colpo debole. Era `bottomZoneMultiplier`. |
+| `perfectTolerance` | 0.03 | — | Metà larghezza della zona perfetta, attorno al 100%. Con 0.03 la zona va dal 97% al 103%. **Non può superare `overchargeMax`**, altrimenti la zona "oltre" non esisterebbe. |
+| `perfectMultiplier` | 1.3 | 1.3 | Il boost del colpo perfetto. Era `topZoneMultiplier`. |
+| `overchargeMultiplier` | 1.6 | — | La potenza oltre il 100%: la palla più veloce del gioco. **Tienilo sopra `perfectMultiplier`.** Vale anche quando non c'è un nemico da cercare: allora la palla parte dritta con l'angolo scelto. Con un bersaglio e `SkullHoming.arcAngle` > 0 la velocità la decide la curva, non questo numero. |
 
-Dopo il tiro, `LastShotZone` dice in quale zona si era fermata la carica e
-`LastShotImpulse` con quanta forza è partita la palla. Per ora li legge solo l'HUD;
-serviranno al punteggio.
+**Quanto dura la zona perfetta, nel tempo**: `2 × perfectTolerance × chargeTime` secondi.
+Con 0.03 e 1.2 s sono **0,07 secondi**, circa 4 frame a 60 fps. Se è troppo difficile, alza
+`perfectTolerance` o `chargeTime`.
+
+Dopo il tiro, `LastShotZone` dice in quale zona si era fermata la carica,
+`LastShotImpulse` con quanta forza è partita la palla, `LastShotHoming` se è partita a
+ricerca. Serviranno al punteggio.
 
 ### Anteprima della traiettoria (quadratini)
 
@@ -224,8 +566,10 @@ Con più oggetti nella sfera si vedono più traiettorie, e i quadratini si divid
 | `trajectoryStep` | 0.05 | Secondi simulati per punto. `steps × step` = **quanti secondi di volo** si vedono: 80 × 0,05 = 4 s. |
 | `trajectoryMask` | tutto | Cosa ferma l'anteprima. |
 
-Mentre scegli l'angolo l'anteprima disegna il tiro a potenza piena: ti dice fin dove
-arriveresti dando tutto. Mentre carichi, segue la carica.
+Mentre scegli l'angolo l'anteprima disegna il tiro al 100% (colpo perfetto): ti dice fin
+dove arriveresti col colpo migliore. Mentre carichi, segue la carica. **Oltre il 100%**, se
+c'è un nemico agganciato, disegna la curva della palla a ricerca verso di lui: così vedi
+chi stai mirando.
 
 > **Attenzione a cosa promette.** L'anteprima calcola una parabola pulita e niente altro:
 > non tiene conto di `airDamping`, dei rimbalzi, degli urti. Vale fino al punto in cui
@@ -256,9 +600,10 @@ Comandi:
 | Spazio | salta |
 | Ctrl | tuffo, a terra o in aria. È la schivata |
 | mouse | gira la camera |
-| tasto destro | **tenuto**: modalità tiro. Lasciato: si esce |
-| tasto sinistro | colpo di mazza. In modalità tiro: tieni premuto per caricare, rilascia per tirare |
-| rotella | angolo del tiro, solo in modalità tiro |
+| tasto destro | **tenuto**: modalità tiro. Lasciato: si esce, anche durante la carica |
+| tasto sinistro | colpo di mazza: stordisce, non fa danno. In modalità tiro: tieni premuto per caricare, rilascia per tirare |
+| rotella | angolo del tiro, sempre tranne durante la carica |
+| 1-9 (riga in alto o tastierino) | angoli fissi del tiro (`SkullAimController.loftPresets`) |
 
 Due modi:
 
@@ -268,6 +613,15 @@ Due modi:
 > **Il corpo non viene mai spostato a mano.** Il Rigidbody resta dinamico: anche in mira si
 > muove dando una velocità, quindi i muri lo fermano. Viene messo in **Interpolate** in
 > `Awake()`, per la camera incollata.
+
+### Palla
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `ignoreBall` | true | Il corpo passa attraverso la palla. All'avvio spegne gli urti fra i collider del corpo e quelli della palla. Così camminandole addosso o mettendosi in postura non la sposta: la palla si muove solo col colpo. |
+
+Conseguenza: anche una palla che rotola verso il corpo lo attraversa. È voluto. Quando ci
+sarà "prendere gli oggetti", una palla vicina si raccoglierà con **E**.
 
 ### Velocità
 
@@ -402,7 +756,7 @@ Si lavora così: sposti `Skeletal_arm` dove vuoi, salvi la posa, e la rimetti a 
 |---|---|---|
 | `clubPivot` | `Skeletal_arm` | La mazza. |
 | `clubHead` | `club_head` | Figlio della mazza, sulla punta che tocca terra. Il punto di colpo sta sotto di lui. Vuoto = il punto sta `stanceDistance` davanti al corpo. |
-| `restPose` | **`Skeletal_arm`** | La posa di riposo. **Va lasciato vuoto**: vuoto = dove sta la mazza all'avvio. Puntato sulla mazza stessa non fa danni ma non serve. |
+| `restPose` | vuoto | La posa di riposo. Vuoto = dove sta la mazza all'avvio. Sistemato dall'utente il 2026-10-12: prima puntava sulla mazza stessa. |
 | `addressPose` | `Mazza a mira` | La posa di mira, davanti alla faccia. Vuoto = la posa di riposo, che col corpo girato di 90° finisce lungo la linea di tiro. |
 | `addressBlendSpeed` | 14 | Quanto in fretta la mazza va in posa entrando in mira. |
 
@@ -424,7 +778,7 @@ sostituirà un'animazione vera.
 |---|---|---|---|
 | `swingPivot` | (0, 0.5, −0.5) | (0, 0.5, −0.5) | Il centro dell'arco, nello spazio del personaggio: un punto **dietro il collo**. Non le spalle: le spalle non ruotano su se stesse, è la mazza che gira attorno a quel punto. |
 | `backswingAngle` | 160 | **180** | Gradi lungo l'arco a carica piena, verso destra. **Positivo.** 90 = testa della mazza di lato all'altezza delle spalle, 180 = in alto dietro la testa. |
-| `followThroughAngle` | −160 | **+160** | Gradi a fine follow-through, verso sinistra. **Negativo**: positivo va dalla stessa parte della carica. **In scena è sbagliato, va messo negativo.** Scala con la carica: un colpo piano ha un follow-through corto. |
+| `followThroughAngle` | −160 | −160 | Gradi a fine follow-through, verso sinistra. **Negativo**: positivo va dalla stessa parte della carica. Scala con la carica: un colpo piano ha un follow-through corto. |
 | `invertSwingSide` | false | false | Se la carica va a sinistra invece che a destra. |
 | `topRadius` | 0.5 | — | Quanto si stringe l'arco salendo: in cima il raggio (pivot → mazza) è moltiplicato per questo numero, come braccia e polsi che si piegano. 1 = arco largo quanto la mazza. |
 | `swingDuration` | 0.3 | **0.25** | Durata della frustata al rilascio, dalla carica al follow-through. |
@@ -463,17 +817,21 @@ il corpo: è dove la mazza colpirebbe adesso.
 ### Colpo a mano
 
 Serve a rendere il gioco un action puzzle invece di un gioco di soli tiri: senza la testa
-il personaggio non è disarmato. Ma è **volutamente meno efficace della palla**.
+il personaggio non è disarmato. Ma **non fa danno**: **stordisce**. Il nemico colpito cade,
+vola via e dopo un po' si rialza (`EnemyStun`, cap. 7). La palla resta l'unica arma.
+Deciso dall'utente il 2026-10-13.
+
+Vale per **tutto quello che la mazza colpisce senza essere la palla**: il colpo a mano e
+i nemici presi dallo swing da golf. Lo swing al 100% o oltre li tiene giù più a lungo.
 
 | Campo | Default | Cosa fa |
 |---|---|---|
 | `meleeAxis` | (1, 0, 0) | Asse locale del colpo a mano. (1,0,0) = dall'alto in basso. |
-| `damage` | 1 | Danno per colpo. Con `EnemyHealth.maxHP` a 3 servono tre colpi per uccidere un nemico, mentre la palla ne uccide diversi in un botto. **È questo numero a decidere quanto la mazza è un'alternativa**: se lo alzi troppo, tirare non serve più. Vale anche per i nemici presi dallo swing da golf. |
 | `range` | 2.5 | Portata, misurata dal centro del personaggio. Solo per il colpo a mano. |
 | `arc` | 110 | Ampiezza del ventaglio colpito davanti, in gradi. Solo per il colpo a mano. |
 | `cooldown` | 0.55 | Secondi fra un colpo e il successivo. |
 | `meleeDuration` | 0.3 | Durata dell'oscillazione. |
-| `hitAt` | 0.45 | A che punto dell'oscillazione il danno viene applicato. Il danno si applica **una volta sola** per colpo. |
+| `hitAt` | 0.45 | A che punto dell'oscillazione il colpo prende i bersagli. Li prende **una volta sola** per colpo. |
 | `meleeFrom` | −70 | Gradi di partenza dell'arco. |
 | `meleeTo` | 70 | Gradi di arrivo. |
 
@@ -481,9 +839,21 @@ il personaggio non è disarmato. Ma è **volutamente meno efficace della palla**
 
 | Campo | Default | Cosa fa |
 |---|---|---|
-| `knockForce` | 6 | Spinta data a chi viene colpito. |
+| `knockForce` | 6 | Spinta data a chi viene colpito: quanto lontano vola lo stordito. |
 | `knockLift` | 0.25 | Quanta parte della spinta va verso l'alto. |
-| `knockWrecks` | true | Il colpo fa uscire dai binari un nemico ancora in fila (`EnemyWreck.Knock()`). Succede **prima** della spinta: un nemico in fila è kinematic, e la spinta da sola non lo muoverebbe. |
+
+`EnemyStun` rende il nemico fisico **prima** della spinta: un nemico in fila è kinematic, e
+la spinta da sola non lo muoverebbe. Un nemico senza `EnemyStun` (non succede: lo aggiunge
+`EnemyHealth`) verrebbe solo spinto, se è già fisico.
+
+### Stordimento dello swing
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `perfectStunMultiplier` | 2 | Moltiplica `EnemyStun.stunDuration` per i nemici presi dallo swing al 100%. |
+| `overchargeStunMultiplier` | 2 | Lo stesso, con lo swing oltre il 100%. |
+
+Il colpo a mano stordisce sempre per la durata normale.
 
 ### Cosa può colpire
 
@@ -491,6 +861,50 @@ il personaggio non è disarmato. Ma è **volutamente meno efficace della palla**
 |---|---|---|
 | `hitMask` | tutto | Quali layer vengono considerati. |
 | `maxTargetsPerSwing` | 16 | Quanti bersagli al massimo in un colpo. È un buffer allocato una volta all'avvio, così un colpo non alloca niente. |
+
+---
+
+## 2-quater. La palla a ricerca — `SkullHoming`
+
+`Assets/Script/Player/SkullHoming.cs` — su `Skull_player`. Se manca, lo aggiunge
+`SkullAimController` all'avvio con i valori di default.
+
+È il colpo **caricato oltre il 100%** che prende la palla. Al rilascio la palla aggancia un
+nemico e gli va addosso seguendo una curva.
+
+**Il bersaglio**: il nemico vivo più vicino dentro un cono davanti al tiro. Se due nemici
+sono quasi alla stessa distanza, vince quello più allineato al tiro. Se nel cono non c'è
+nessuno, la palla parte come un colpo normale a `overchargeMultiplier`.
+
+**La curva**: una parabola che parte `arcAngle` gradi sopra la linea dritta verso il
+nemico. La forma è la stessa a ogni distanza. La velocità si adatta per chiudere la curva
+sul nemico.
+
+**Il volo**: la palla non vola libera. Il codice la porta lungo la curva, dandole una
+velocità a ogni passo di fisica. Resta un corpo fisico, quindi gli urti funzionano. Parte
+lenta e arriva veloce (`easeIn`). La fine della curva viene spostata sul nemico di adesso,
+quindi segue anche chi cammina. La guida si spegne al primo urto, se il nemico muore, o a
+fine curva: da lì la palla continua libera con la velocità che ha.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `range` | 25 | Fin dove cerca un nemico, in metri dalla palla. |
+| `coneAngle` | 35 | Quanto è largo il cono, in gradi a destra e a sinistra del tiro. |
+| `tieDistance` | 0.5 | Metri. Due nemici con meno di questa differenza di distanza contano uguali: vince il più allineato. |
+| `aimHeight` | 0.75 | Dove mira sul nemico, in frazione della sua altezza. 0 = piedi, 0.5 = centro, 1 = cima. |
+| `arcAngle` | 10 | L'arco: di quanti gradi la palla parte sopra la linea dritta. 5-10 = curva leggera, 20 e più = pallonetto. **0 = nessun arco scelto**: la palla parte alla velocità del colpo (`overchargeMultiplier`) sulla parabola più bassa, quasi dritta. |
+| `easeIn` | 2 | Quanto accelera lungo la curva. 1 = velocità costante. 2 = parte da ferma e arriva al doppio della velocità media. Più alto = arrivo più violento. La durata del volo non cambia. |
+| `steering` | 1 | Quanto la fine della curva segue il nemico. 1 = lo prende anche se si sposta. 0 = la curva resta quella del lancio. |
+| `ignoreHitsFor` | 0.1 | Secondi dopo il lancio in cui un urto non spegne la guida: la palla parte da terra e la tocca ancora. |
+| `showGizmo` | true | Il gizmo: un cerchio chiaro per `range`, due linee e un arco per il cono. In Play segue la direzione del tiro, fuori dal Play il forward della testa. |
+
+> **Perché la velocità non è quella del colpo.** A velocità fissa esistono solo due
+> parabole che arrivano su un punto: una bassa, quasi dritta, e una altissima. Non si può
+> scegliere un arco in mezzo. Per avere l'arco scelto la velocità deve adattarsi. Vedi
+> [[Storico]].
+
+> **Legame.** Mentre la palla cerca, `SkullRolling` non la frena e non la ferma: la
+> partenza lenta verrebbe presa per una palla che si sta fermando.
 
 ---
 
@@ -663,12 +1077,16 @@ niente.
 | Campo | Default | In scena | Cosa fa |
 |---|---|---|---|
 | `rollingDamping` | 0.15 | 0.15 | Attrito di rotolamento, in frazione di velocità persa al secondo. Agisce **solo sulle componenti orizzontali** e **solo a terra**. Alto = superficie ruvida/moquette, la palla si ferma subito; basso = ghiaccio. **Comanda la lunghezza dei tiri rasi più di ogni altro numero.** |
-| `stopThreshold` | 0.4 | 0.4 | Sotto questa velocità (m/s) la palla viene azzerata di netto, velocità lineare e angolare — **ma solo se tocca terra**. Serve a non aspettare l'eternità che una sfera quasi ferma si fermi davvero. **Attenzione: questa soglia è anche la definizione di "palla ferma" per tutto il gioco** — `IsStopped` la espone e `SkullAimController` la legge per decidere quando puoi tirare di nuovo. Alzarla rende il gioco più reattivo fra un tiro e l'altro ma tronca i rotolamenti lenti; abbassarla dà tiri lunghi e attese noiose. |
+| `stopThreshold` | 0.4 | 0.4 | Sotto questa velocità (m/s) la palla viene azzerata di netto, velocità lineare e angolare — **ma solo se tocca terra**. Serve a non aspettare l'eternità che una sfera quasi ferma si fermi davvero. **Attenzione: questa soglia è anche la definizione di "palla ferma" per tutto il gioco** — `IsStopped` la espone e `ShotCamera` la legge per chiudere la telecronaca. Alzarla tronca i rotolamenti lenti; abbassarla dà rotolamenti lunghi. |
 | `airDamping` | 0 | — | Attrito dell'aria: frazione di velocità **orizzontale** persa al secondo mentre il teschio vola. `0` = parabola pulita e prevedibile, identica all'anteprima. Alzandolo i tiri alti si accorciano e l'anteprima diventa ottimista. |
 | `groundNormalMin` | 0.5 | — | Quanto deve essere rivolta in su la normale di un contatto per contare come terreno (0-1). 0.5 ≈ 60° di pendenza massima. Alzalo se il teschio "si appoggia" a pareti troppo inclinate; abbassalo se su una rampa ripida si comporta come se fosse in volo. |
 | `groundGrace` | 0.12 | — | Per quanti secondi resta considerato "a terra" dopo l'ultimo contatto. Evita che su un terreno mosso l'attrito si accenda e spenga a intermittenza. Alzarlo troppo fa frenare il teschio nei primi istanti di volo. |
 | `collisionSpeedLoss` | 0.12 | 0.35 | Frazione di velocità persa in un urto **perfettamente frontale** (range 0-1). Un urto di striscio perde molto meno, in proporzione al coseno dell'angolo d'impatto: così rotolare lungo un muro non frena. `0` disattiva del tutto la perdita e lascia fare a PhysX. **Si somma a quello che PhysX ha già tolto** (vedi cap. 13, Bounciness): tenerla alta significa frenare due volte. |
 | `minImpactSpeed` | 1 | 1 | Sotto questa velocità d'impatto (m/s) l'urto non conta. Evita che i micro-contatti col pavimento fermino la palla. Se la palla "si incolla" toccando le pareti, alzalo. |
+
+> **Mentre la palla cerca un nemico** (`SkullHoming.IsHoming`, cap. 2-quater) questo
+> script non frena e non ferma. La palla a ricerca parte lenta: verrebbe presa per una palla
+> che si sta fermando e azzerata.
 
 ---
 
@@ -717,8 +1135,7 @@ Con `maxPower = 20`:
 | **45°** (gittata massima) | **≈ 41 m** | ≈ 10,2 m |
 | 55° (`maxLoftAngle` attuale) | ≈ 38 m | ≈ 13,7 m |
 
-Se accendi la zona alta della carica (`zoneWidth` > 0 con `topZoneMultiplier = 1.3`, cioè
-26 m/s):
+Col colpo perfetto (`perfectMultiplier = 1.3`, cioè 26 m/s):
 
 | Angolo | Carry | Altezza massima |
 |---|---|---|
@@ -834,6 +1251,37 @@ muoia: vale anche da vivo.
 > dall'azione. Senza tetto, una strada trafficata piena di rottami diventa in fretta un
 > simulatore di fisica: è l'unico numero che davvero protegge il frame rate.
 
+### `EnemyStun` — lo stordimento della mazza
+
+`Assets/Script/Enemy/EnemyStun.cs`. Richiede `Rigidbody`.
+
+È quello che fa la mazza a un nemico: **non toglie vita**. Il colpo lo butta giù: il corpo
+diventa fisico, vola, si ribalta e rotola. Dopo `stunDuration` aspetta di essersi quasi
+fermato, poi si raddrizza e torna a fare quello che faceva. Deciso dall'utente il
+2026-10-13: la palla deve restare l'arma vera.
+
+**Non va aggiunto a mano**: se un nemico ha `EnemyHealth` e un Rigidbody ma non ha
+`EnemyStun`, lo aggiunge `EnemyHealth` all'avvio coi valori di default. Mettilo sul prefab
+solo per tararlo.
+
+| Campo | Default | Cosa fa |
+|---|---|---|
+| `stunDuration` | 2 | Secondi a terra prima di provare a rialzarsi. Lo swing al 100% o oltre lo moltiplica (`PlayerSwing.perfectStunMultiplier`, `overchargeStunMultiplier`). |
+| `settleSpeed` | 0.5 | Si rialza solo quando va più piano di così, in m/s: non si rialza mentre rotola ancora. |
+| `maxExtraWait` | 2 | Secondi in più al massimo ad aspettare che si fermi. Poi si rialza comunque. |
+| `tumbleSpin` | 6 | Rotazione data dal colpo, in rad/s, per farlo ribaltare in avanti. 0 = viene solo spinto. |
+| `getUpTime` | 0.5 | Secondi per tornare dritto. |
+
+Colpito di nuovo mentre è a terra, il conto ricomincia. Se muore o diventa rottame
+(`EnemyWreck`) mentre è a terra, lo stordimento si interrompe e il corpo resta alla fisica.
+
+`IsDown` è vero a terra e mentre si rialza: lo leggono `EnemyPatrol` e `EnemyLaneSpawner`
+per fermarsi. Eventi `onStunned` e `onRecovered` per suoni ed effetti.
+
+> **Il ragdoll.** Il nemico oggi è un cubo, quindi il "ragdoll" è il cubo intero lasciato
+> alla fisica. Con un modello con le ossa il ragdoll vero si accende nello stesso punto,
+> `EnemyStun.Stun`.
+
 ---
 
 ## 7-bis. Gli archetipi di nemico
@@ -918,6 +1366,9 @@ Non ti ferma con gli HP ma con la fisica: si mangia gran parte della velocità d
 > l'onda d'urto che lo ha ucciso lo spedisce via: per questo `SkullExplosion` applica il
 > danno *prima* della spinta, nella stessa iterazione.
 
+**Stordito dalla mazza** (`EnemyStun.IsDown`) il pattugliamento si ferma. Rialzato, riparte
+da dov'è e torna sul percorso camminando.
+
 ### `EnemyLaneSpawner` — la strada a corsie
 
 `Assets/Script/Enemy/EnemyLaneSpawner.cs`
@@ -952,6 +1403,13 @@ scorrono fino a B e ricompaiono in A, distribuiti a distanza costante.
 | `crashUpwards` | 0.5 | Quanto la spinta va verso l'alto. Alto = tamponamento spettacolare, corpi in aria. |
 | `crashDamage` | 0 | Danno agli spazzati via. **`0` = solo spinta**, restano vivi e rotolano in giro come corpi fisici. Alzarlo trasforma l'incidente in una carambola che fa punti Danni e uccisioni — attenzione se il livello ha una quota `requiredKills`, perché diventa molto più facile. |
 | `crashRecovery` | 4 | Secondi prima che il traffico riparta, scaglionato. **`-1` = la corsia resta chiusa per sempre.** |
+
+**L'incidente lo provoca solo la testa.** La mazza stordisce senza fare danno, quindi
+non lo innesca: deciso dall'utente.
+
+Un nemico **stordito dalla mazza** tiene il suo posto in fila: chi sta dietro frena come
+davanti a un'auto ferma. Rialzato, torna in corsia camminando alla velocità della corsia,
+poi riprende la marcia.
 
 Solo la corsia colpita si ferma: le altre continuano. Gli spazzati via **non vengono più
 guidati**: da quel momento li muove solo la fisica, quindi possono finire in mezzo alle
@@ -1208,9 +1666,12 @@ regista della finestra della telecronaca (cap. 3-bis). Quelli non sono cablati s
 | `powerRoot` | — | Il gruppo della barra di potenza: acceso solo mentre serve. Il generatore la fa **verticale, a sinistra**, come in Super Battle Golf. |
 | `showWhileAiming` | true | Mostra la barra a zero già in stato `Aiming`, così non compare di colpo al primo click. |
 | `powerGradient` | giallo → arancio → rosso | Colore della barra di potenza. |
-| `powerLabel` / `powerFormat` | `{0:0}%` | La percentuale di carica. |
+| `powerLabel` / `powerFormat` | `{0:0}%` | La percentuale di carica. Arriva a 110: è la carica vera, non la barra. |
 | `powerLabelFollowsFill` | true | La percentuale sale insieme al riempimento, accanto alla barra. Serve una barra verticale e un'etichetta ancorata in basso, come la crea il generatore. |
-| `loftRoot` | — | Il gruppo dell'angolo di tiro: acceso in `Aiming` **e** in `Powering`. L'angolo resta scritto anche dopo averlo confermato, così si ricorda con che angolo si sta per tirare. |
+| `perfectColor` | giallo | Colore del riempimento nella zona perfetta (attorno al 100%). Sostituisce il gradiente. |
+| `overchargeColor` | viola | Colore del riempimento oltre il 100%. |
+| `weakBand` / `perfectBand` / `overchargeBand` | — | Tre strisce a destra della barra che segnano le zone della carica. L'altezza la calcola l'HUD dalle tolleranze di `SkullAimController`: cambiando le tolleranze le strisce seguono. Una zona larga zero sparisce. Le crea `GOOMD > Rifai barra potenza`. |
+| `loftRoot` | — | Il gruppo dell'angolo di tiro: **sempre acceso**, perché l'angolo si sceglie anche fuori dalla mira. |
 | `loftLabel` / `loftFormat` | `{0:0} gradi` | L'angolo in gradi. Scritto «gradi» e non il simbolo di grado di proposito: i `.cs` di questo progetto stanno senza caratteri accentati per non avere sorprese di encoding. |
 | `loftBar` | — | Opzionale: lo `Slider` che mostra l'angolo sul ventaglio (0-1), non in gradi. |
 | `damageFormat` | `{0:n0}` | Formato del punteggio danni (separatore delle migliaia). |
@@ -1373,6 +1834,14 @@ perché regga, e cosa resta da fare quando i numeri cresceranno ancora.
 | Mira più precisa | `CameraController.lookSensitivity` ↓ |
 | Più facile prendere la palla | `PlayerSwing.strikeRadius` ↑ |
 | Passo di lato più rapido entrando in mira | `PlayerController.stanceMoveSpeed` ↑ e `stanceSnap` ↑ |
+| Colpo perfetto più facile da prendere | `SkullAimController.perfectTolerance` ↑ o `chargeTime` ↑ |
+| Angoli diversi sui tasti numerici | `SkullAimController.loftPresets` (frazioni del ventaglio) |
+| Palla a ricerca più curva | `SkullHoming.arcAngle` ↑ |
+| Palla a ricerca più dritta | `SkullHoming.arcAngle` ↓, o 0 per la parabola bassa alla velocità del colpo |
+| Palla a ricerca che arriva più violenta | `SkullHoming.easeIn` ↑ |
+| La ricerca aggancia nemici più laterali | `SkullHoming.coneAngle` ↑ |
+| Nemici storditi più a lungo | `EnemyStun.stunDuration` ↑ |
+| Nemici storditi che volano più lontano | `PlayerSwing.knockForce` ↑ |
 | Allinearsi alla palla più fine | `PlayerController.aimStepSpeed` ↓ |
 | Swing più stretto attorno al corpo | `PlayerSwing.topRadius` ↓ |
 | Mazza più in alto in cima alla carica | `PlayerSwing.backswingAngle` ↑ (180 = in alto dietro la testa) |
@@ -1446,10 +1915,10 @@ produce bug silenziosi, non errori di compilazione.
    telecronaca si chiude quando il corpo torna a quella distanza dalla testa. Se si
    chiude mentre la testa è ancora fuori dall'inquadratura principale, per un attimo non
    vedi né l'una né l'altra.
-11. **`PlayerSwing.damage` vs `EnemyHealth.maxHP`** — decide se la mazza a mano è
-   un'alternativa alla palla o la sostituisce. Con `damage` 1 e `maxHP` 3 servono tre
-   colpi: la mazza è un ripiego. Alzandolo, tirare smette di convenire e il gioco perde
-   il suo pezzo migliore.
+11. **`EnemyStun.stunDuration` vs la velocità dei nemici** — la mazza non fa danno, ma
+   uno stordimento lungo toglie di mezzo un nemico per tutto quel tempo. Troppo lungo e la
+   mazza diventa un modo per svuotare la strada senza tirare. Ricorda che lo swing al 100%
+   e oltre lo moltiplica (`PlayerSwing.perfectStunMultiplier`, `overchargeStunMultiplier`).
 12. **`SkullAimController.chargeTime` vs la velocità dei nemici** — caricare a fondo tiene
    il personaggio fermo per quel tempo. Se i nemici arrivano più in fretta di così, il
    colpo pieno diventa impossibile da dare in mezzo al traffico. È voluto che costi
@@ -1481,6 +1950,15 @@ produce bug silenziosi, non errori di compilazione.
 20. **`PlayerController.stanceAngle` vs la posa di mira** — con il corpo girato di 90° la
    posa di mira va **davanti alla faccia**. La posa di riposo (alla destra del corpo) col
    corpo girato finisce lungo la linea di tiro, e sembra un errore.
+21. **`perfectTolerance` vs `overchargeMax`** — la zona perfetta sta attorno al 100% e la
+   zona "oltre" comincia dove finisce. Se `perfectTolerance` arriva a `overchargeMax` la
+   palla a ricerca non si può più ottenere. `OnValidate` impedisce di superarlo.
+22. **`perfectMultiplier` vs `overchargeMultiplier`** — oltre il 100% deve essere la palla
+   più veloce. Se `overchargeMultiplier` è più basso, caricare oltre il perfetto dà un
+   colpo più debole.
+23. **`SkullHoming.arcAngle` e la velocità** — con un arco scelto la velocità della palla a
+   ricerca la decide la curva, non `overchargeMultiplier`. Archi bassi verso nemici lontani
+   chiedono velocità alte. Con `arcAngle` 0 vale di nuovo `overchargeMultiplier`.
 
 ---
 
@@ -1498,21 +1976,19 @@ Aperte, da tenere presenti quando si progetta il bilanciamento:
 - **La telecronaca non è pensata per le parabole**: tiene una quota fissa sopra la testa e
   la guarda, quindi su un tiro molto alto inquadra il cielo. Non è rotto, è da tarare (o da
   rifare con un offset che segue anche la verticale).
-- **L'angolo si sceglie solo in mira.** L'utente vuole poterlo impostare anche mentre non
-  tira.
 - **Lo swing è un arco calcolato, non un'animazione.** Si tara con `swingPivot`,
   `backswingAngle`, `followThroughAngle`, `topRadius`. Prima o poi lo sostituirà
   un'animazione vera.
 - **Il personaggio non ha animazioni.** `PlayerController.IsRunning`, `IsCrouching`,
   `IsGrounded`, `IsDiving`, `IsGettingUp` e `PlayerSwing.IsSwinging` sono pubblici proprio
   per attaccarci un Animator. Il tuffo inclina solo la parte visibile (`visual`).
-- **Il colpo carico non fa più danno di un colpetto.** I nemici presi dallo swing usano lo
-  stesso `damage` del colpo a mano: la carica non entra nel conto. Va deciso insieme agli
-  oggetti di scena colpibili.
 - **Prendere gli oggetti non esiste ancora.** È la prossima funzionalità, e sarà una
-  meccanica centrale: prendere la testa e rimetterla al suo posto, farla cadere per
-  poterla colpire, mettere altre cose al posto della testa. È anche il "recupero della
-  testa" di cui l'utente parlava.
+  meccanica centrale: con **E** si prende la testa vicina e la si mette sulle spalle, con
+  E di nuovo la si posa già sul punto di colpo. Altre cose al posto della testa, da
+  valutare. È anche il "recupero della testa" di cui l'utente parlava.
+- **I campi nuovi del 2026-10-13 non sono tarati**: zone della carica, palla a ricerca,
+  stordimento. Hanno solo il default. L'utente li tarerà in una sessione dedicata, insieme
+  a `Bounciness` di `Base_ground`.
 - **`explosionVFX`, `deathVFX`, `triggeredVFX` non assegnati.**
 - **HUD senza stile**: rettangoli pieni e font di default. Manca anche la UI degli HP
   dei singoli nemici (per ora il feedback è solo il flash rosso).

@@ -10,8 +10,8 @@ using UnityEngine.InputSystem;
 //                      sale indietro lungo un arco attorno alle spalle, tanto piu'
 //                      quanto si carica; al rilascio ripassa sul punto, prosegue
 //                      oltre (il follow-through) e torna a riposo.
-//   FUORI              il colpo a mano col tasto sinistro: portata corta, poco danno,
-//                      tempo di ricarica. E' volutamente meno efficace della palla.
+//   FUORI              il colpo a mano col tasto sinistro: portata corta, niente danno,
+//                      tempo di ricarica. Stordisce e basta: la palla resta l'arma.
 //
 // LO SWING E' UN ARCO, non un'animazione. In mira il corpo sta di fianco al tiro
 // (PlayerController.stanceAngle 90) e la mazza e' davanti alla faccia, con la testa
@@ -91,19 +91,24 @@ public class PlayerSwing : MonoBehaviour
 
     [Header("Colpo a mano")]
     public Vector3 meleeAxis = Vector3.right;    // asse del colpo a mano: (1,0,0) = dall'alto in basso
-    public int damage = 1;              // basso di proposito: la palla fa molto di piu'
     public float range = 2.5f;           // portata, dal centro del personaggio
     [Range(0f, 360f)] public float arc = 110f;  // ampiezza del ventaglio colpito
     public float cooldown = 0.55f;       // secondi fra un colpo e il successivo
     public float meleeDuration = 0.3f;
-    [Range(0f, 1f)] public float hitAt = 0.45f; // a che punto del colpo il danno conta
+    [Range(0f, 1f)] public float hitAt = 0.45f; // a che punto del colpo si prende il bersaglio
     public float meleeFrom = -70f;       // gradi di partenza dell'arco a mano
     public float meleeTo = 70f;          // gradi di arrivo
 
+    // La mazza non toglie vita: butta giu' il nemico (EnemyStun) con questa spinta.
     [Header("Spinta")]
     public float knockForce = 6f;
     public float knockLift = 0.25f;      // quota verso l'alto, in frazione di knockForce
-    public bool knockWrecks = true;      // fa uscire dai binari i nemici ancora in fila
+
+    // Lo swing da golf che prende un nemico al 100% o oltre lo tiene giu' piu' a lungo.
+    // Moltiplicano EnemyStun.stunDuration.
+    [Header("Stordimento dello swing")]
+    public float perfectStunMultiplier = 2f;     // carica al 100%
+    public float overchargeStunMultiplier = 2f;  // carica oltre il 100%
 
     [Header("Cosa si puo' colpire")]
     public LayerMask hitMask = ~0;
@@ -252,10 +257,10 @@ public class PlayerSwing : MonoBehaviour
             Rigidbody targetRb = health.GetComponent<Rigidbody>();
             if (targetRb == null || result.Contains(targetRb)) continue;
 
-            // un nemico in fila e' kinematic, ma il colpo lo fa uscire dai binari
+            // un nemico in fila e' kinematic, ma lo stordimento lo rende fisico
             // prima di spingerlo (HitTarget), quindi vola anche lui
-            bool loosened = knockWrecks && health.GetComponent<EnemyWreck>() != null;
-            if (targetRb.isKinematic && !loosened) continue;
+            EnemyStun stun = health.GetComponent<EnemyStun>();
+            if (targetRb.isKinematic && (stun == null || !stun.CanStun)) continue;
 
             result.Add(targetRb);
         }
@@ -312,7 +317,8 @@ public class PlayerSwing : MonoBehaviour
     // E' una chiamata diretta e non un controllo sullo stato, perche' l'ordine
     // degli Update fra due script non e' garantito: accorgersi del rilascio
     // guardando lo stato lo farebbe arrivare un frame dopo.
-    public void OnShotReleased(float chargeRatio, Vector3 launchDirection)
+    public void OnShotReleased(float chargeRatio, Vector3 launchDirection,
+                               SkullAimController.PowerZone zone)
     {
         releasedCharge = Mathf.Clamp01(chargeRatio);
         followTimer = Mathf.Max(0.01f, swingDuration);
@@ -320,6 +326,10 @@ public class PlayerSwing : MonoBehaviour
         cooldownTimer = Mathf.Max(swingDuration, cooldown);
 
         if (!HasStrikePoint || hits == null) return;
+
+        float stunMultiplier = zone == SkullAimController.PowerZone.Perfect ? perfectStunMultiplier
+                             : zone == SkullAimController.PowerZone.Overcharge ? overchargeStunMultiplier
+                             : 1f;
 
         alreadyHit.Clear();
         int count = OverlapStrike();
@@ -330,7 +340,7 @@ public class PlayerSwing : MonoBehaviour
             if (health == null || health.IsDead || alreadyHit.Contains(health)) continue;
 
             alreadyHit.Add(health);
-            HitTarget(health, launchDirection);
+            HitTarget(health, launchDirection, stunMultiplier);
         }
     }
 
@@ -404,7 +414,7 @@ public class PlayerSwing : MonoBehaviour
         if (state == SkullAimController.State.Powering)
         {
             recoverTimer = 0f;
-            ApplySwingAngle(backswingAngle * Mathf.Clamp01(aim.PowerRatio));
+            ApplySwingAngle(backswingAngle * Mathf.Clamp01(aim.ChargeRatio));
             return;
         }
 
@@ -432,7 +442,7 @@ public class PlayerSwing : MonoBehaviour
             float eased = t * t;
             SetMeleeAngle(Mathf.Lerp(meleeFrom, meleeTo, eased));
 
-            // il danno si applica una volta sola, a meta' dell'arco: un controllo a
+            // il colpo prende una volta sola, a meta' dell'arco: un controllo a
             // ogni frame colpirebbe lo stesso nemico piu' volte nello stesso colpo
             if (!hitDone && t >= hitAt)
             {
@@ -604,20 +614,15 @@ public class PlayerSwing : MonoBehaviour
         }
     }
 
-    void HitTarget(EnemyHealth health, Vector3 pushDirection)
+    // La mazza non fa danno: stordisce. Il nemico cade, rotola e si rialza
+    // (EnemyStun). Deciso dall'utente: la palla deve restare l'arma vera.
+    // Vale per il colpo a mano e per i nemici presi dallo swing da golf.
+    void HitTarget(EnemyHealth health, Vector3 pushDirection, float stunMultiplier = 1f)
     {
-        // Prima fuori dai binari: un nemico in fila e' kinematic e la spinta non lo
-        // muoverebbe. Poi la spinta, poi il danno: se il colpo lo uccide l'oggetto
-        // puo' sparire, e il Rigidbody con lui.
-        if (knockWrecks)
-        {
-            EnemyWreck wreck = health.GetComponent<EnemyWreck>();
-            if (wreck != null && !wreck.IsLoose) wreck.Knock();
-        }
+        EnemyStun stun = health.GetComponent<EnemyStun>();
 
-        Push(health, pushDirection);
-
-        if (damage > 0) health.TakeDamage(damage);
+        if (stun != null) stun.Stun(PushImpulse(pushDirection), stunMultiplier);
+        else Push(health, pushDirection);
     }
 
     void Push(EnemyHealth health, Vector3 direction)

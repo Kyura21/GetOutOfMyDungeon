@@ -110,6 +110,65 @@ Resta utile `bottomZonePower`: a carica zero la forza è zero, e qualunque molti
 applicato a zero resta zero, quindi senza quel campo un colpo a carica nulla non
 partirebbe affatto.
 
+### Scartato: la carica che si ferma al 100% (2026-10-13)
+
+Con la carica che si fermava al massimo, la zona alta non era una prova di tempismo: la
+prendeva chiunque aspettasse (vedi la voce sopra). L'utente ha cambiato il modello:
+
+- il colpo **perfetto** è al **100%**, con una tolleranza sua (`perfectTolerance`);
+- la carica **continua fino al 110%** allo stesso ritmo (`overchargeMax`), quindi tenendo
+  premuto si **supera** il perfetto;
+- oltre il 100% non è "più forte e basta": è un altro colpo, la **palla a ricerca**.
+
+Così il tempismo torna a contare. Le zone sono diventate quattro (debole, normale,
+perfetta, oltre). I campi vecchi sono stati rinominati tenendo i valori:
+`zoneWidth` → `weakTolerance`, `bottomZonePower` → `weakPower`, `bottomZoneMultiplier` →
+`weakMultiplier`, `topZoneMultiplier` → `perfectMultiplier`.
+
+### Scartato: l'angolo che riparte da zero a ogni mira (2026-10-13)
+
+Entrando in mira l'angolo tornava a `startLoftRatio`, perché "un colpo alto rimasto in
+memoria sarebbe una sorpresa". L'utente vuole scegliere l'angolo **sempre**, anche
+camminando, e con angoli fissi sui tasti numerici. Allora l'angolo deve restare dove lo
+lascia il giocatore: azzerarlo all'ingresso in mira cancellerebbe la scelta appena fatta.
+Resta bloccato **solo durante la carica**: per cambiarlo si esce dalla mira (deciso
+dall'utente).
+
+### Scartato: la palla a ricerca a velocità minima (2026-10-13)
+
+La prima palla a ricerca seguiva la parabola che arriva sul nemico con la velocità più
+bassa possibile. È una parabola **alta**, circa a 45°. L'utente la voleva **diretta**,
+"come colpire un nemico alla testa".
+
+### Scartato: la palla a ricerca alla velocità del colpo, sulla parabola bassa (2026-10-13)
+
+Seconda prova: velocità fissa (`maxPower × overchargeMultiplier`, la palla più veloce) e la
+più bassa delle due parabole possibili. Era **troppo dritta**. L'utente voleva un arco da
+scegliere.
+
+A velocità fissa l'arco non si può scegliere: esistono solo due parabole che arrivano su
+un punto, una quasi dritta e una altissima. Per questo ora si sceglie l'arco (`arcAngle`,
+gradi sopra la linea dritta) e la **velocità si adatta**. Con `arcAngle` 0 si torna alla
+parabola bassa alla velocità del colpo.
+
+### Scartato: la palla a ricerca che vola libera e corregge la rotta (2026-10-13)
+
+Fino alla seconda prova la palla veniva lanciata e in volo correggeva la velocità verso il
+nemico. Velocità di volo libero: rallenta salendo, accelera scendendo, niente di più.
+L'utente voleva che **partisse lenta e arrivasse velocissima**. Un volo libero non può
+farlo. Ora il codice porta la palla lungo la curva con un'accelerazione (`easeIn`),
+dandole una velocità a ogni passo: resta un corpo fisico e gli urti funzionano.
+
+Effetto collaterale: `SkullRolling` prendeva la partenza lenta per una palla che si ferma e
+la azzerava. Mentre la palla cerca, `SkullRolling` non interviene.
+
+### Scartato: il corpo che spinge la palla (2026-10-13)
+
+Corpo e palla si urtavano come due oggetti qualsiasi. Camminando vicino alla palla, o
+mettendosi in postura accanto a lei, la si spostava senza volerlo. Ora il corpo la
+attraversa (`PlayerController.ignoreBall`). La palla si muove solo col colpo. Quando ci
+sarà "prendere gli oggetti", una palla vicina si raccoglierà con E.
+
 ### Scartato: dividere lo scroll per 120
 
 Il primo conteggio degli scatti di rotella divideva il valore letto per 120, che è quanto
@@ -502,6 +561,19 @@ Burnout 3: le auto distrutte **restano in strada** e innescano la carambola.
 Da qui `EnemyWreck`: al primo colpo il corpo esce dai binari e diventa un birillo che
 rotola, ingombra, spinge e danneggia gli altri nemici. `deathBehaviour` ha ancora `Destroy`
 e `Deactivate`, ma `Wreck` è la scelta di design.
+
+### Scartato: la mazza che fa danno (2026-10-13)
+
+Il colpo a mano toglieva 1 HP (`PlayerSwing.damage`) e mandava il nemico fuori dai binari
+per sempre (`knockWrecks`, cioè `EnemyWreck.Knock`). Il danno faceva anche partire
+l'incidente di corsia. Con tre colpi si uccideva un nemico: la mazza era un'alternativa
+debole alla palla, ma pur sempre un'arma. Anche lo swing da golf usava lo stesso danno, e
+un colpo carico non valeva più di un colpetto.
+
+L'utente ha deciso: **la mazza non fa danno, stordisce**. Il nemico cade (il "ragdoll"),
+vola, si rialza e torna a fare quello che faceva (`EnemyStun`). La palla resta l'unica
+arma. Lo swing al 100% e oltre lo tiene giù più a lungo. **L'incidente lo provoca solo la
+testa**: la mazza non lo innesca, ed è voluto. Tolti `damage` e `knockWrecks`.
 
 ### Scartato: il rottame che danneggia sempre
 

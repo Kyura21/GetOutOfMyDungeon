@@ -103,6 +103,8 @@ public class EnemyLaneSpawner : MonoBehaviour
         public EnemyHealth health;
         public Rigidbody rb;
         public EnemyWreck wreck;
+        public EnemyStun stun;
+        public bool rejoining; // rialzato dopo lo stordimento: torna in corsia camminando
         public int lane;
         public float t;        // 0 = testa della corsia, 1 = fondo
         public float speed;    // sua, non della corsia: ognuno va per conto proprio
@@ -242,6 +244,20 @@ public class EnemyLaneSpawner : MonoBehaviour
                     continue;
                 }
 
+                // stordito dalla mazza: tiene il suo posto in fila, e chi sta dietro
+                // frena come davanti a un'auto ferma
+                if (r.stun != null && r.stun.IsDown)
+                {
+                    r.rejoining = true;
+                    continue;
+                }
+
+                if (r.rejoining)
+                {
+                    Rejoin(r, i, lane);
+                    continue;
+                }
+
                 Advance(r, list, lane);
 
                 if (r.t >= 1f)
@@ -326,6 +342,8 @@ public class EnemyLaneSpawner : MonoBehaviour
             other.health = null;
             other.rb = null;
             other.wreck = null;
+            other.stun = null;
+            other.rejoining = false;
             other.retired = true;
         }
     }
@@ -413,6 +431,8 @@ public class EnemyLaneSpawner : MonoBehaviour
         r.health = r.go.GetComponent<EnemyHealth>();
         r.rb = r.go.GetComponent<Rigidbody>();
         r.wreck = r.go.GetComponent<EnemyWreck>();
+        r.stun = r.go.GetComponent<EnemyStun>();
+        r.rejoining = false;
 
         // sui binari finche' e' vivo: un corpo dinamico spostato a mano
         // combatte col solver
@@ -466,6 +486,8 @@ public class EnemyLaneSpawner : MonoBehaviour
         r.health = null;
         r.rb = null;
         r.wreck = null;
+        r.stun = null;
+        r.rejoining = false;
 
         if (killed) TriggerCrash(r.lane, at);
     }
@@ -545,6 +567,35 @@ public class EnemyLaneSpawner : MonoBehaviour
         Quaternion rotation = Quaternion.LookRotation(TravelDirection(laneIndex, r.t), Vector3.up);
         if (r.rb != null && r.rb.isKinematic) r.rb.MoveRotation(rotation);
         else r.go.transform.rotation = rotation;
+    }
+
+    // Dopo lo stordimento il nemico e' dove l'ha lasciato la caduta, fuori corsia.
+    // Ci torna camminando alla velocita' della corsia, poi riprende la marcia.
+    // Senza questo Move() lo riporterebbe sulla corsia di scatto.
+    void Rejoin(Runner r, int laneIndex, Lane lane)
+    {
+        if (r.rb == null || !r.rb.isKinematic)
+        {
+            r.rejoining = false;
+            return;
+        }
+
+        Vector3 target = LanePoint(laneIndex, r.t);
+        Vector3 to = target - r.rb.position;
+        float step = Mathf.Max(lane.speed, 0.5f) * Time.fixedDeltaTime;
+
+        if (to.magnitude <= step)
+        {
+            r.rb.MovePosition(target);
+            r.rejoining = false;
+            return;
+        }
+
+        r.rb.MovePosition(r.rb.position + to.normalized * step);
+
+        Vector3 flat = new Vector3(to.x, 0f, to.z);
+        if (faceTravelDirection && flat.sqrMagnitude > 0.0001f)
+            r.rb.MoveRotation(Quaternion.LookRotation(flat.normalized, Vector3.up));
     }
 
     // ---------- geometria della strada ----------

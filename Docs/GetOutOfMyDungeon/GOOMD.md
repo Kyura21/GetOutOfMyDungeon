@@ -36,9 +36,11 @@ Claude Code legge automaticamente.
 | Spazio | salta |
 | Ctrl | tuffo, a terra o in aria. È la schivata: atterrati, ci si rialza piano |
 | mouse | gira la camera, e la camera dà la direzione del tiro |
-| tasto destro | **tenuto**: modalità tiro. Lasciato: si esce |
-| tasto sinistro | colpo di mazza. In modalità tiro: tieni premuto per caricare, rilascia per tirare |
-| rotella | angolo del tiro, solo in modalità tiro |
+| tasto destro | **tenuto**: modalità tiro. Lasciato: si esce, anche durante la carica |
+| tasto sinistro | colpo di mazza: stordisce, non fa danno. In modalità tiro: tieni premuto per caricare, rilascia per tirare |
+| rotella | angolo del tiro, sempre tranne durante la carica. Un giro = 25% del ventaglio |
+| 1-9 (riga in alto o tastierino) | angoli fissi del tiro |
+| E | *(da fare)* prende la testa vicina e la mette sulle spalle; di nuovo, la posa sul punto di colpo |
 
 ## Il tiro, in breve
 
@@ -46,11 +48,20 @@ Claude Code legge automaticamente.
   davanti alla sua faccia con la testa a terra. La camera si avvicina.
 - La mira **parte da dove guarda il personaggio** e si riallinea a dove guarda la camera.
 - L'**angolo** è quanto in alto vuoi tirare la palla: zero è raso terra, il massimo è un
-  campanile, metà è teso in avanti. Un giro di rotella lo cambia del 25%.
+  campanile, metà è teso in avanti. Si sceglie **sempre**, anche camminando: rotella o
+  tasti numerici. In carica è bloccato.
 - La **potenza** si carica tenendo premuto. Più carichi, più la mazza sale dietro il corpo.
-  La barra è verticale, a sinistra, con la percentuale.
+  La barra è verticale, a sinistra, con la percentuale. La carica va **fino al 110%**:
+  - al **100%** è il colpo **perfetto**: più potenza;
+  - **oltre il 100%** la palla diventa **a ricerca**: aggancia il nemico più vicino davanti
+    e gli va addosso con una curva, partendo lenta e arrivando velocissima.
+
+  È una prova di tempismo: tenendo premuto si supera il perfetto.
 - Sotto la testa della mazza c'è una **sfera di colpo**: tutto quello che la tocca viene
   colpito, palla e nemici insieme. Se non tocca niente, la mazza mulina a vuoto.
+- La mazza **non fa danno ai nemici**: li **stordisce**. Cadono, volano via e si rialzano.
+  La palla resta l'unica arma. L'incidente di corsia lo provoca solo la testa.
+- Il corpo **passa attraverso la palla**: non la sposti camminandole addosso.
 - I **quadratini** mostrano la traiettoria: dalla palla e dai nemici nella sfera, o dalla
   sfera stessa se è vuota.
 - Dopo il colpo il personaggio è subito libero: non si aspetta che la palla si fermi.
@@ -68,15 +79,17 @@ finché il corpo non arriva vicino alla testa. Serve anche a ritrovarla.
 
 ### Taratura, per argomento
 
-- **cap. 2** — il tiro: direzione, angolo, potenza, cosa prende il colpo, traiettoria
+- **cap. 1-bis** — **elenco rapido**: ogni parametro di ogni script, in poche parole
+- **cap. 2** — il tiro: direzione, angolo, potenza, zone della carica, cosa prende il colpo, traiettoria
 - **cap. 2-bis** — il personaggio: movimento, corsa, crouch, postura in mira, salto, tuffo
-- **cap. 2-ter** — la mazza: pose, arco dello swing, sfera di colpo, colpo a mano
+- **cap. 2-ter** — la mazza: pose, arco dello swing, sfera di colpo, colpo a mano, stordimento
+- **cap. 2-quater** — la palla a ricerca
 - **cap. 3** — la camera: terza persona a offset fisso, più vicina in mira
 - **cap. 3-bis** — la telecronaca: la finestra che segue il tiro nell'HUD
 - **cap. 4** — il rotolamento: attrito, frenata, volo
 - **cap. 5** — l'integrità del teschio, e i conti di gittata e altezza
 - **cap. 6** — l'esplosione
-- **cap. 7 e 7-bis** — i nemici e i loro archetipi
+- **cap. 7 e 7-bis** — i nemici, lo stordimento e i loro archetipi
 - **cap. 8** — vittoria e sconfitta
 - **cap. 9 e 10** — la buca e gli apri-buca
 - **cap. 11 e 12** — zone di morte e puzzle
